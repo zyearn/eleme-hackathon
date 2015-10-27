@@ -1,0 +1,3 @@
+pymysql
+pytest
+redis
