@@ -11,7 +11,8 @@ def test_empty_request_error(url, username, password):
     )
 
     assert res.status_code == 400
-    assert res.json().get("message") == "empty request"
+    assert res.json().get("code") == "EMPTY_REQUEST"
+    assert res.json().get("message") == u"请求体为空"
 
 
 def test_malformed_json_error(url):
@@ -20,12 +21,14 @@ def test_malformed_json_error(url):
         data="not a json request",
         headers={"Content-type": "application/json"},
     )
-    assert res.status_code == 753
-    assert res.json().get("message") == "malformed json"
+    assert res.status_code == 400
+    assert res.json().get("code") == "MALFORMED_JSON"
+    assert res.json().get("message") == u"格式错误"
 
 
 def test_auth_error(url):
     res = requests.get(url + "/foods")
 
     assert res.status_code == 401
-    assert res.json().get("message") == "invalid access token"
+    assert res.json().get("code") == "INVALID_ACCESS_TOKEN"
+    assert res.json().get("message") == u"无效的令牌"

@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 import json
 import os
@@ -67,7 +67,7 @@ def token(get_token, username, password):
 
 
 @pytest.fixture(scope="session")
-def new_token(conn, get_token, username):
+def tokens(conn, get_token, username):
     users = []
     c = conn.cursor()
     c.execute("SELECT name, password FROM `user` "
@@ -93,9 +93,9 @@ def price_of(conn):
 
 
 @pytest.fixture(scope="session")
-def stock_of(url, conn, new_token):
+def stock_of(url, conn, token):
     def _f(food_id):
-        res = jget(url + "/foods", new_token().next())
+        res = jget(url + "/foods", token)
         assert res.status_code == 200
         foods = res.json()
         for f in foods:

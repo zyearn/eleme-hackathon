@@ -25,7 +25,8 @@ def test_login_error_password(url, username):
     )
 
     assert res.status_code == 403
-    assert res.json().get("message") == "username or password incorrect"
+    assert res.json().get("code") == "USER_AUTH_FAIL"
+    assert res.json().get("message") == u"用户名或密码错误"
 
 
 def test_login_post_data(url, username, password):
@@ -36,5 +37,6 @@ def test_login_post_data(url, username, password):
         headers={"Content-type": "application/json"},
     )
 
-    assert res.status_code == 753
-    assert res.json().get("message") == "malformed json"
+    assert res.status_code == 400
+    assert res.json().get("code") == "MALFORMED_JSON"
+    assert res.json().get("message") == "格式错误"

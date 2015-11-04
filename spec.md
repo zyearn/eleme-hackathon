@@ -19,8 +19,28 @@
     "message": "无效的令牌"
 }
 ```
-
 其中后台接口只有用root用户登录后的access_token才能访问。
+
+
+如果需要传参的接口，传过来的body为空。则返回400异常:
+
+```
+400 Bad Request
+{
+    "code": "EMPTY_REQUEST",
+    "message": "请求体为空"
+}
+```
+
+如果需要传参的接口，传过来的请求体json格式有误。则返回400异常:
+
+```
+400 Bad Request
+{
+    "code": "MALFORMED_JSON",
+    "message": "格式错误"
+}
+```
 
 <a name="login" />
 
@@ -111,7 +131,6 @@ POST /carts?access_token=xxx
 }
 ```
 
-
 <a name="food" />
 ## 添加食物
 
@@ -182,10 +201,18 @@ PATCH /carts/e0c68eb96bd8495dbb8fcd8e86fc48a3?access_token=xxx
 }
 ```
 
+食物不存在：
+
+```
+403 Forbidden
+{
+    "code": "FOOD_NOT_FOUND",
+    "message": "食物不存在"
+}
+```
 
 <a name="order" />
 ## 下单
-
 `POST /orders`
 
 ##### 请求体
@@ -244,10 +271,8 @@ POST /orders?access_token=xxx
 }
 ```
 
-
 <a name="orders" />
 ## 查询订单
-
 `GET /orders`
 
 #### 请求示例
@@ -266,7 +291,7 @@ GET /orders?access_token=xxx
         "items": [
             {"food_id": 2, "count": 1}
         ],
-        "total": 20
+        "total": 10
     }
 ]
 ```
@@ -274,7 +299,6 @@ GET /orders?access_token=xxx
 
 <a name="admin-orders" />
 ## 后台接口－查询订单
-
 `GET /admin/orders`
 
 #### 请求示例
@@ -294,7 +318,8 @@ GET /admin/orders?access_token=xxx
         "items": [
             {"food_id": 2, "count": 1}
         ],
-        "total": 20
+        "total": 10
     }
 ]
 ```
+
