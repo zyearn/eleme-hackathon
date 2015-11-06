@@ -74,8 +74,6 @@ def test_add_food_not_exists_error(url, token, cart_id):
     food_count = {"food_id": -1, "count": 2}
     res = jpatch(url + "/carts/%s" % cart_id, token, food_count)
     assert res.status_code == 404
-    print(res.json())
-    # TBD
     assert res.json()["code"] == "FOOD_NOT_FOUND"
     assert res.json()["message"] == u"食物不存在"
 
@@ -94,7 +92,8 @@ def test_make_order(url, token, make_order, price_of):
     food, = order["items"]
     assert food["food_id"] == items["food_id"]
     assert food["count"] == items["count"]
-    assert order["total"] == price_of(items["food_id"]) * items["count"]
+    assert order["total"] == sum(price_of(item["food_id"]) * item["count"]
+                                 for item in order["items"])
 
     # test only 1 order can be made
     res = make_order(token)

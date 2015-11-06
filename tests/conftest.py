@@ -26,8 +26,11 @@ def conf():
 
 @pytest.fixture(scope="session")
 def conn():
-    return pymysql.connect(host="localhost", port=3306,
-                           user="root", passwd="toor", db="eleme",
+    return pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
+                           port=int(os.getenv("DB_PORT", 3306)),
+                           user=os.getenv("DB_USER", "root"),
+                           passwd=os.getenv("DB_PASS", "toor"),
+                           db=os.getenv("DB_NAME", "eleme"),
                            cursorclass=pymysql.cursors.DictCursor,
                            autocommit=True)
 

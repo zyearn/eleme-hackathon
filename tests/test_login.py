@@ -11,9 +11,7 @@ def test_login_success(url, username, password):
         data=json.dumps(data),
         headers={"Content-type": "application/json"},
     )
-
     assert res.status_code == 200
-    assert len(res.json().get("access_token", "")) == 32
 
 
 def test_login_error_password(url, username):
@@ -39,4 +37,4 @@ def test_login_post_data(url, username, password):
 
     assert res.status_code == 400
     assert res.json().get("code") == "MALFORMED_JSON"
-    assert res.json().get("message") == "格式错误"
+    assert res.json().get("message") == u"格式错误"
