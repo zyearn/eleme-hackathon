@@ -192,16 +192,6 @@ PATCH /carts/e0c68eb96bd8495dbb8fcd8e86fc48a3?access_token=xxx
 }
 ```
 
-食物库存不足：
-
-```
-403 Forbidden
-{
-    "code": "FOOD_OUT_OF_STOCK",
-    "message": "食物库存不足"
-}
-```
-
 食物数量超过篮子最大限制：
 
 ```
@@ -215,7 +205,7 @@ PATCH /carts/e0c68eb96bd8495dbb8fcd8e86fc48a3?access_token=xxx
 食物不存在：
 
 ```
-403 Forbidden
+404 Not Found
 {
     "code": "FOOD_NOT_FOUND",
     "message": "食物不存在"
@@ -224,6 +214,7 @@ PATCH /carts/e0c68eb96bd8495dbb8fcd8e86fc48a3?access_token=xxx
 
 <a name="order" />
 ## 下单
+
 `POST /orders`
 
 ##### 请求体
@@ -246,7 +237,7 @@ POST /orders?access_token=xxx
 ```
 200 OK
 {
-    "id ": "1024234783243"
+    "id ": "someorderid"
 }
 ```
 
@@ -255,7 +246,7 @@ POST /orders?access_token=xxx
 篮子不存在
 
 ```
-403 Forbidden
+404 Not Found
 {
     "code": "CART_NOT_FOUND",
     "message": "篮子不存在"
@@ -269,6 +260,16 @@ POST /orders?access_token=xxx
 {
     "code": "NOT_AUTHORIZED_TO_ACCESS_CART",
     "message": "无权限访问指定的篮子"
+}
+```
+
+食物库存不足：
+
+```
+403 Forbidden
+{
+    "code": "FOOD_OUT_OF_STOCK",
+    "message": "食物库存不足"
 }
 ```
 
@@ -298,7 +299,7 @@ GET /orders?access_token=xxx
 200 OK
 [
     {
-        "id": 1024,
+        "id": "someorderid",
         "items": [
             {"food_id": 2, "count": 1}
         ],
@@ -324,7 +325,7 @@ GET /admin/orders?access_token=xxx
 200 OK
 [
     {
-        "id": 1024,
+        "id": "someorderid",
         "user_id": 1,
         "items": [
             {"food_id": 2, "count": 1}
