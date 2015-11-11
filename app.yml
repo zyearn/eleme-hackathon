@@ -1,0 +1,4 @@
+language: py2
+script:
+  - pip install -r requirements.txt
+  - python app.py
