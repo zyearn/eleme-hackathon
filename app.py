@@ -1,18 +1,13 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
 import os
 
-from flask import Flask, request, jsonify
+import tornado.ioloop
+import tornado.web
 import pymysql
 import pymysql.cursors
 import json
 
-
-host = os.getenv("APP_HOST", "localhost")
-port = int(os.getenv("APP_PORT", "8080"))
-
-app = Flask(__name__)
 
 def conn():
     return pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
@@ -22,34 +17,45 @@ def conn():
                            db=os.getenv("DB_NAME", "eleme"),
                            cursorclass=pymysql.cursors.DictCursor,
                            autocommit=True)
+mysqlconn = None
 
-@app.route('/')
-def hello_world():
-    return 'Hello World!'
+class HelloHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.write("Hello, world")
 
-@app.route('/login', methods=['POST'])
-def login():
-    try:
-        data = json.loads(request.data)
-    except (ValueError, KeyError, TypeError) as error:
-        print error
-        return jsonify({'code':'MALFORMED_JSON', 'message':u'格式错误'}), 400
+class LoginHandler(tornado.web.RequestHandler):
+    def post(self):
+        if not self.request.body:
+            self.set_status(400)
+            self.write({'code':'EMPTY_REQUEST', 'message':'请求体为空'})
+            return
 
-    if not bool(request.json):
-        return jsonify({'code':'EMPTY_REQUEST', 'message':u'请求体为空'}), 400
+        try:
+            data = json.loads(self.request.body.decode('utf-8'))
+        except (ValueError, KeyError, TypeError) as error:
+            self.set_status(400)
+            self.write({'code':'MALFORMED_JSON', 'message':'格式错误'})
+            return
 
+        with mysqlconn.cursor() as cursor:
+            sql = "select id, name from user where name=%s and password=%s"
+            cursor.execute(sql, (data['username'], data['password']))
+            result = cursor.fetchone()
+
+        if result:
+            self.write({'user_id':result['id'], 'username':result['name'], 'access_token':'xxdabc'})
+        else:
+            self.set_status(403)
+            self.write({'code':'USER_AUTH_FAIL', 'message':'用户名或密码错误'})
+
+if __name__ == "__main__":
+    app = tornado.web.Application([
+        (r"/", HelloHandler),
+        (r'/login', LoginHandler)
+    ], debug=True)
+
+    host = os.getenv("APP_HOST", "localhost")
+    port = int(os.getenv("APP_PORT", "8080"))
+    app.listen(port=port, address=host)
     mysqlconn = conn()
-    with mysqlconn.cursor() as cursor:
-        sql = "select id, name from user where name=%s and password=%s"
-        cursor.execute(sql, (request.json['username'], request.json['password']))
-        result = cursor.fetchone()
-
-    if bool(result):
-        return jsonify({'user_id':result['id'], 'username':result['name'], 'access_token':'xxdabc'})
-    else:
-        return jsonify({'code':'USER_AUTH_FAIL', 'message':u'用户名或密码错误'}), 403
-
-
-if __name__ == '__main__':
-    app.debug=True
-    app.run(host=host, port=port)
+    tornado.ioloop.IOLoop.current().start()
