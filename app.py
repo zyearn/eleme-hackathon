@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import os
-
 import tornado.ioloop
 import tornado.web
 import pymysql
 import pymysql.cursors
 import json
-
+import redis
+import transfer
 
 def conn():
     return pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
