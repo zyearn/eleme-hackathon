@@ -1,12 +1,16 @@
 import os
 import redis
 import sys
+import random
+import string
 import pymysql
 import pymysql.cursors
 
+import const
+
 r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"), 
                       port=os.getenv("REDIS_PORT", 6379), 
-                       db=0)
+                      db=0, decode_responses=True)
 
 TOKEN_LENGTH = 8
 
@@ -47,29 +51,24 @@ def random_string(length):
 def login(username, password):
     userid = r.get('username:%s:userid' % username)
     pwd = r.get('username:%s:password' % username)
-    if password != pwd:
-        return False
+    if not userid or password != pwd:
+        return { 'err': const.INCORRECT_PASSWORD }
+
     token = random_string(TOKEN_LENGTH)
     r.set('token:%s:user'%token, userid)
-    return token
+    return { 'userid': userid, 'token': 'token' }
 
-# access_token check decorator
-def check_access_token(f):
-    def wrapper(token, *args, **kwargs):
-        userid = r.get('token:%s:user'%token)
-        if not userid:
-            return False
-        f((token, userid), *args, **kwargs)
-    return wrapper
+# check access_token
+def is_token_exist(token):
+    return r.exists('token:%s:user'%token)
 
 # query stocks of all foods
 def query_stocks():
     pass
 
 # create cart
-@check_access_token
-def create_cart(access_token):
-    token, userid = access_token
+def cart_create(token):
+    userid = r.get('token:%s:user'%token)
     cartid = random_string(TOKEN_LENGTH)
     r.set('cart:%s:user'%cartid, userid)
-    return cartid
+    return { 'cartid': cartid }

@@ -4,68 +4,76 @@ import os
 import sys
 import tornado.ioloop
 import tornado.web
-import pymysql
-import pymysql.cursors
 import json
-import redis
-import transfer
-import string
-import random
 
-def id_generator(size=8, chars=string.ascii_uppercase + string.digits):
-    return ''.join(random.choice(chars) for _ in range(size))
+import const
+import model
 
-def conn():
-    return pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
-                           port=int(os.getenv("DB_PORT", 3306)),
-                           user=os.getenv("DB_USER", "root"),
-                           passwd=os.getenv("DB_PASS", "toor"),
-                           db=os.getenv("DB_NAME", "eleme"),
-                           cursorclass=pymysql.cursors.DictCursor,
-                           autocommit=True)
-mysqlconn = None
-pool = redis.ConnectionPool(host=os.getenv("REDIS_HOST", "localhost"),
-                        port=os.getenv("REDIS_PORT", 6379), 
-                        db=0)
+def parse_request_body(self):
+    if not self.request.body:
+        self.set_status(400)
+        self.write(const.EMPTY_REQUEST)
+        return False
 
-class HelloHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.write("Hello, world")
+    try:
+        data = json.loads(self.request.body.decode('utf-8'))
+    except (ValueError, KeyError, TypeError) as error:
+        self.set_status(400)
+        self.write(const.MALFORMED_JSON)
+        return False
+
+    return data
+
+def check_token(f):
+    def wrapper(self, *arg, **kwargs):
+        t1 = self.get_argument('access_token', None)
+        t2 = self.request.headers.get('Access-Token', None)
+
+        if t1 or t2:
+            token = t1 if t1 else t2
+            if model.is_token_exist(token):
+                kwargs['token'] = token
+                f(self, *arg, **kwargs)
+                return
+        self.set_status(401)
+        self.write(const.INVALID_ACCESS_TOKEN)
+    return wrapper
+
 
 class LoginHandler(tornado.web.RequestHandler):
     def post(self):
-        if not self.request.body:
-            self.set_status(400)
-            self.write({'code':'EMPTY_REQUEST', 'message':'请求体为空'})
-            return
+        data = parse_request_body(self)
+        if not data: return
 
-        try:
-            data = json.loads(self.request.body.decode('utf-8'))
-        except (ValueError, KeyError, TypeError) as error:
-            self.set_status(400)
-            self.write({'code':'MALFORMED_JSON', 'message':'格式错误'})
-            return
-
-        r = redis.Redis(connection_pool=pool)
-        password = r.get('username:'+data['username']+':password')
-        if password is None or password.decode('utf-8') != data['password']:
-            self.set_status(403)
-            self.write({'code':'USER_AUTH_FAIL', 'message':'用户名或密码错误'})
-            return
+        username = data['username']
+        password = data['password']
+        res = model.login(username, password)
         
-        userId = r.get('username:'+data['username']+':userid').decode('utf-8');
-        actoken = id_generator();
-        r.set('token:'+actoken+':user', userId);
-        self.write({'user_id':userId, 'username':data['username'], 'access_token':actoken})
+        if 'err' in res:
+            if res['err'] == const.INCORRECT_PASSWORD:
+                self.set_status(403)
+                self.write(const.USER_AUTH_FAIL)
+            return
+        self.write({'user_id':res['userid'], 'username':username, 'access_token':res['token']})
+
+
+
+class CartsHandler(tornado.web.RequestHandler):
+
+    @check_token
+    def post(self, token):
+        res = model.cart_create(token)
+        self.write({'cart_id': res['cartid']})
 
 if __name__ == "__main__":
+    model.sync_redis_from_mysql() # FIX ME!!!
+
     app = tornado.web.Application([
-        (r"/", HelloHandler),
-        (r'/login', LoginHandler)
+        (r'/login', LoginHandler),
+        (r'/carts', CartsHandler)
     ], debug=True)
 
     host = os.getenv("APP_HOST", "localhost")
     port = int(os.getenv("APP_PORT", "8080"))
     app.listen(port=port, address=host)
-    mysqlconn = conn()
     tornado.ioloop.IOLoop.current().start()
