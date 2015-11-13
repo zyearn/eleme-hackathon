@@ -9,6 +9,11 @@ import pymysql.cursors
 import json
 import redis
 import transfer
+import string
+import random
+
+def id_generator(size=8, chars=string.ascii_uppercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
 
 def conn():
     return pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
@@ -49,7 +54,9 @@ class LoginHandler(tornado.web.RequestHandler):
             return
         
         userId = r.get('username:'+data['username']+':userid').decode('utf-8');
-        self.write({'user_id':userId, 'username':data['username'], 'access_token':'xxdabc'})
+        actoken = id_generator();
+        r.set('token:'+actoken+':user', userId);
+        self.write({'user_id':userId, 'username':data['username'], 'access_token':actoken})
 
 if __name__ == "__main__":
     app = tornado.web.Application([
