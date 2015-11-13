@@ -32,5 +32,5 @@ with mysqlconn.cursor() as cursor:
         r.set('food:'+str(result['id'])+':price', result['price'])
         r.rpush('food_list', result['id'])
 
-sys.stderr.write('transfer data from mysql to redis done')
+sys.stderr.write('transfer data from mysql to redis done\n')
 sys.stderr.flush()
