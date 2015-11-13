@@ -56,7 +56,7 @@ def login(username, password):
 
     token = random_string(TOKEN_LENGTH)
     r.set('token:%s:user'%token, userid)
-    return { 'userid': userid, 'token': 'token' }
+    return { 'userid': userid, 'token': token }
 
 # check access_token
 def is_token_exist(token):
