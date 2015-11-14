@@ -59,18 +59,27 @@ class LoginHandler(tornado.web.RequestHandler):
 
 
 class CartsHandler(tornado.web.RequestHandler):
-
+    # @param suffix: None (post), /:cartid?... (patch)
+    # @param cartid: None (post), :cartid (patch)
+    # Because regex groups in router must be all named or all unnamed!
     @check_token
-    def post(self, token):
+    def post(self, token, suffix, cartid):
         res = model.cart_create(token)
         self.write({'cart_id': res['cartid']})
+
+    # TODO 
+    @check_token
+    def patch(self, token, suffix, cartid):
+        print('xxx')
+        self.set_status(204)
+
 
 if __name__ == "__main__":
     model.sync_redis_from_mysql() # FIX ME!!!
 
     app = tornado.web.Application([
         (r'/login', LoginHandler),
-        (r'/carts', CartsHandler)
+        (r'/carts(?P<suffix>/(?P<cartid>[0-9a-zA-Z]+)\S+)?', CartsHandler),
     ], debug=True)
 
     host = os.getenv("APP_HOST", "localhost")

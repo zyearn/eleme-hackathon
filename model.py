@@ -39,7 +39,7 @@ def sync_redis_from_mysql():
         for result in results:
             p.set('food:%d:stock'%result['id'], result['stock'])
             p.set('food:%d:price'%result['id'], result['price'])
-            p.rpush('food_list', result['id'])
+            p.sadd('food_list', result['id'])
 
         p.execute()
 
@@ -56,7 +56,7 @@ def login(username, password):
 
     token = random_string(TOKEN_LENGTH)
     r.set('token:%s:user'%token, userid)
-    return { 'userid': userid, 'token': 'token' }
+    return { 'userid': userid, 'token': token }
 
 # check access_token
 def is_token_exist(token):
@@ -72,3 +72,6 @@ def cart_create(token):
     cartid = random_string(TOKEN_LENGTH)
     r.set('cart:%s:user'%cartid, userid)
     return { 'cartid': cartid }
+
+def is_food_exist(food_id):
+    return r.sismember('food_list', food_id)
