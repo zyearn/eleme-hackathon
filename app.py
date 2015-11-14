@@ -39,7 +39,6 @@ def check_token(f):
         self.write(const.INVALID_ACCESS_TOKEN)
     return wrapper
 
-
 class LoginHandler(tornado.web.RequestHandler):
     def post(self):
         data = parse_request_body(self)
@@ -79,13 +78,39 @@ class FoodsHandler(tornado.web.RequestHandler):
         res = model.get_food()
         self.write(json.dumps(res))
 
+class OrdersHandler(tornado.web.RequestHandler):
+    @check_token
+    def post(self, token):
+        data = parse_request_body(self)
+        if not data: return
+
+        cart_id = data['cart_id']
+        ret = model.orders(cart_id, token)
+        errcode = ret['err']
+        if errcode == 0:
+            self.write({"id": ret['order_id']})
+        elif errcode == -1:
+            self.set_status(404)
+            self.write(const.CART_NOT_FOUND)
+        elif errcode == -2:
+            self.set_status(403)
+            self.write(const.NOT_AUTHORIZED_TO_ACCESS_CART)
+        elif errcode == -3:
+            self.set_status(403)
+            self.write(const.FOOD_OUT_OF_STOCK)
+        else:
+            #errcode == -4
+            self.set_status(403)
+            self.write(const.ORDER_OUT_OF_LIMIT)
+
 if __name__ == "__main__":
     model.sync_redis_from_mysql() # FIX ME!!!
 
     app = tornado.web.Application([
         (r'/login', LoginHandler),
         (r'/carts(?P<suffix>/(?P<cartid>[0-9a-zA-Z]+)\S+)?', CartsHandler),
-        (r'/foods', FoodsHandler)
+        (r'/foods', FoodsHandler),
+        (r'/orders', OrdersHandler)
     ], debug=True)
 
     host = os.getenv("APP_HOST", "localhost")

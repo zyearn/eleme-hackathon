@@ -7,11 +7,13 @@ import pymysql
 import pymysql.cursors
 
 import const
+import orderslua
 
 r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"), 
                       port=os.getenv("REDIS_PORT", 6379), 
                       db=0, decode_responses=True)
 
+orders_lua = r.register_script(orderslua.orders)
 TOKEN_LENGTH = 8
 
 # sync redis from mysql
@@ -44,7 +46,7 @@ def sync_redis_from_mysql():
         p.execute()
 
 # generate random string
-def random_string(length):
+def random_string(length=TOKEN_LENGTH):
     return ''.join([random.choice(string.ascii_letters + string.digits) for n in range(length)])
 
 # login
@@ -83,3 +85,18 @@ def get_food():
     for (k,v), (k2,v2) in zip(food_price.items(), food_stock.items()):
         result.append({'id':int(k), 'price':int(v), 'stock':int(v2)})
     return result
+
+
+def orders(cart_id, token):
+    rtn = orders_lua(keys=[cart_id, token])
+    result = {'err': rtn}
+    if rtn == 0:
+        user_id = r.get('token:%s:user' % token)
+        order_id = random_string()
+        r.set('user:%s:order' % str(user_id), order_id)
+        r.set('order:%s:user' % order_id, user_id)
+        r.hset('order:cart', order_id, cart_id)
+        result['order_id'] = order_id
+
+    return result
+
