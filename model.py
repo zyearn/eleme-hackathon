@@ -6,6 +6,7 @@ import string
 import pymysql
 import pymysql.cursors
 import const
+import time
 
 TOKEN_LENGTH = 8
 
@@ -31,7 +32,7 @@ def sync_redis_from_mysql():
         sys.stderr.write("redis has already been init\n")
         sys.stderr.flush()
         while int(r.get(const.INIT_TIME)) != -1:
-            pass
+            time.sleep(0.1)
         return
 
     mysqlconn = pymysql.connect(host=os.getenv("DB_HOST", "localhost"),

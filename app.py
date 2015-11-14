@@ -151,6 +151,8 @@ class AdminOrdersHandler(tornado.web.RequestHandler):
 
 if __name__ == "__main__":
     model.sync_redis_from_mysql()
+    sys.stderr.write("start serving\n")
+    sys.stderr.flush()
 
     app = tornado.web.Application([
         (r'/login', LoginHandler),
