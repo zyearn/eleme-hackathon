@@ -131,7 +131,7 @@ GET /foods?access_token=xxx
 ```
 POST /carts?access_token=xxx
 
-``python decorator`
+```
 
 #### 响应示例
 
