@@ -78,10 +78,6 @@ def login(username, password):
 def is_token_exist(token):
     return r.exists('token:%s:user'%token)
 
-# query stocks of all foods
-def query_stocks():
-    pass
-
 # create cart
 def cart_create(token):
     userid = r.get('token:%s:user'%token)
@@ -134,7 +130,7 @@ def get_order(token):
         total += price * c
         item_arr.append({'food_id': f, 'count': c})
     return {
-        'userid': userid,
+        'userid': int(userid),
         'orderid': orderid,
         'items': item_arr,
         'total': total

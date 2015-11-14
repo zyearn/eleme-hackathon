@@ -135,15 +135,32 @@ class OrdersHandler(tornado.web.RequestHandler):
             self.set_status(403)
             self.write(const.ORDER_OUT_OF_LIMIT)
 
+class AdminOrdersHandler(tornado.web.RequestHandler):
+    @check_token
+    def get(self, token):
+        res = model.get_order(token)
+        if not res:
+            self.write(json.dumps([]))
+        else:
+            ret = []
+            ret.append({
+                'id': res['orderid'],
+                'items': res['items'],
+                'total': res['total'],
+                'user_id': res['userid']
+            })
+            self.write(json.dumps(ret))
+
 if __name__ == "__main__":
-    model.sync_redis_from_mysql() # FIX ME!!!
+    model.sync_redis_from_mysql()
 
     app = tornado.web.Application([
         (r'/login', LoginHandler),
         (r'/carts', CartsPostHandler),
         (r'/carts/(.*)', CartsHandler),
         (r'/foods', FoodsHandler),
-        (r'/orders', OrdersHandler)
+        (r'/orders', OrdersHandler),
+        (r'/admin/orders', AdminOrdersHandler)
     ], debug=True)
 
     host = os.getenv("APP_HOST", "localhost")
