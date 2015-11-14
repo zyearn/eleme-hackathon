@@ -73,6 +73,11 @@ class CartsHandler(tornado.web.RequestHandler):
         print('xxx')
         self.set_status(204)
 
+class FoodsHandler(tornado.web.RequestHandler):
+    @check_token
+    def get(self, token):
+        res = model.get_food()
+        self.write(json.dumps(res))
 
 if __name__ == "__main__":
     model.sync_redis_from_mysql() # FIX ME!!!
@@ -80,6 +85,7 @@ if __name__ == "__main__":
     app = tornado.web.Application([
         (r'/login', LoginHandler),
         (r'/carts(?P<suffix>/(?P<cartid>[0-9a-zA-Z]+)\S+)?', CartsHandler),
+        (r'/foods', FoodsHandler)
     ], debug=True)
 
     host = os.getenv("APP_HOST", "localhost")

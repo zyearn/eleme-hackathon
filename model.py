@@ -35,11 +35,11 @@ def sync_redis_from_mysql():
 
         cursor.execute("select id,stock,price from food")
         results = cursor.fetchall()
-        p.delete('food_list')
+        p.delete(const.FOOD_SET)
         for result in results:
-            p.set('food:%d:stock'%result['id'], result['stock'])
-            p.set('food:%d:price'%result['id'], result['price'])
-            p.sadd('food_list', result['id'])
+            p.hset(const.FOOD_STOCK, result['id'], result['stock'])
+            p.hset(const.FOOD_PRICE, result['id'], result['price'])
+            p.sadd(const.FOOD_SET, result['id'])
 
         p.execute()
 
@@ -74,4 +74,12 @@ def cart_create(token):
     return { 'cartid': cartid }
 
 def is_food_exist(food_id):
-    return r.sismember('food_list', food_id)
+    return r.sismember(const.FOOD_SET, food_id)
+
+def get_food():
+    food_price = r.hgetall(const.FOOD_PRICE)
+    food_stock = r.hgetall(const.FOOD_STOCK)
+    result = []
+    for (k,v), (k2,v2) in zip(food_price.items(), food_stock.items()):
+        result.append({'id':int(k), 'price':int(v), 'stock':int(v2)})
+    return result
