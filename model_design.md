@@ -10,9 +10,9 @@ cart:<cartid>:user             <userid>
 cart:<cartid>                  { <foodid>: <cnt> }
 order:<orderid>:user           <userid>
 order:<orderid>                { <foodid>: <cnt> }
-food:count                     {<foodid> : <count>}
+food:stock                     {<foodid> : <stock>}
 food:price                     {<foodid> : <price>}
-food_list                      { <foodid1>, <foodid2>, ... } //SET
+food_set                      { <foodid1>, <foodid2>, ... } //SET
 username:<username>:userid     <userid>
 username:<username>:password   <password>
 ```
@@ -20,9 +20,9 @@ username:<username>:password   <password>
 ## Sync with MySQL
 
 ```
-food:<foodid>:count
-food:<foodid>:price
-food_list
+food:stock
+food:price
+food_set
 username:<username>:userid
 username:<username>:password
 ```
