@@ -10,9 +10,9 @@ cart:<cartid>:user             <userid>
 cart:<cartid>                  { <foodid>: <cnt> }
 order:<orderid>:user           <userid>
 order:<orderid>                { <foodid>: <cnt> }
-food:<foodid>:count            <count>
-food:<foodid>:price            <price>
-food_list                      [ <foodid1>, <foodid2>, ... ]
+food:count                     {<foodid> : <count>}
+food:price                     {<foodid> : <price>}
+food_list                      { <foodid1>, <foodid2>, ... } //SET
 username:<username>:userid     <userid>
 username:<username>:password   <password>
 ```
