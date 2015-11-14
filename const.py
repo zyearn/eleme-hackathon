@@ -5,6 +5,9 @@ INVALID_ACCESS_TOKEN = {"code": "INVALID_ACCESS_TOKEN", "message": "无效的令
 EMPTY_REQUEST = {'code':'EMPTY_REQUEST', 'message':'请求体为空'}
 MALFORMED_JSON = {'code':'MALFORMED_JSON', 'message':'格式错误'}
 
+### transfer redis to mysql initialization key
+INIT_TIME = 'INIT_TIME'
+
 ### error code for orders
 CART_NOT_FOUND = {'code':'CART_NOT_FOUND', 'message':'篮子不存在'}
 NOT_AUTHORIZED_TO_ACCESS_CART = {'code':'NOT_AUTHORIZED_TO_ACCESS_CART', 'message':'无权限访问指定的篮子'}

@@ -5,7 +5,6 @@ import random
 import string
 import pymysql
 import pymysql.cursors
-
 import const
 import orderslua
 
@@ -18,6 +17,14 @@ TOKEN_LENGTH = 8
 
 # sync redis from mysql
 def sync_redis_from_mysql():
+    if r.incr(const.INIT_TIME) == 1:
+        sys.stderr.write("ready to init redis\n")
+        sys.stderr.flush()
+    else:
+        sys.stderr.write("redis has already been init\n")
+        sys.stderr.flush()
+        return
+
     mysqlconn = pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
                                port=int(os.getenv("DB_PORT", 3306)),
                                user=os.getenv("DB_USER", "root"),
