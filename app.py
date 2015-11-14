@@ -56,21 +56,37 @@ class LoginHandler(tornado.web.RequestHandler):
         self.write({'user_id':res['userid'], 'username':username, 'access_token':res['token']})
 
 
-
-class CartsHandler(tornado.web.RequestHandler):
-    # @param suffix: None (post), /:cartid?... (patch)
-    # @param cartid: None (post), :cartid (patch)
-    # Because regex groups in router must be all named or all unnamed!
+class CartsPostHandler(tornado.web.RequestHandler):
     @check_token
-    def post(self, token, suffix, cartid):
+    def post(self, token):
         res = model.cart_create(token)
         self.write({'cart_id': res['cartid']})
 
-    # TODO 
+
+class CartsHandler(tornado.web.RequestHandler):
     @check_token
-    def patch(self, token, suffix, cartid):
-        print('xxx')
-        self.set_status(204)
+    def patch(self, cartid, token):
+        data = parse_request_body(self)
+        if not data: return
+
+        foodid = data['food_id']
+        count = data['count']
+        res = model.cart_add_food(token, cartid, foodid, count)
+        if res == 0:
+            self.set_status(204)
+            self.write('')
+        elif res == -1:
+            self.set_status(404)
+            self.write(const.CART_NOT_FOUND)
+        elif res == -2:
+            self.set_status(404)
+            self.write(const.FOOD_NOT_FOUND)
+        elif res == -3:
+            self.set_status(403)
+            self.write(const.FOOD_OUT_OF_LIMIT)
+        else:
+            self.set_status(401)
+            self.write(const.NOT_AUTHORIZED_TO_ACCESS_CART)
 
 class FoodsHandler(tornado.web.RequestHandler):
     @check_token
@@ -80,6 +96,20 @@ class FoodsHandler(tornado.web.RequestHandler):
 
 class OrdersHandler(tornado.web.RequestHandler):
     @check_token
+    def get(self, token):
+        res = model.get_order(token)
+        if not res:
+            self.write(json.dumps([]))
+        else:
+            ret = []
+            ret.append({
+                'id': res['orderid'],
+                'items': res['items'],
+                'total': res['total']
+            })
+            self.write(json.dumps(ret))
+
+    @check_token
     def post(self, token):
         data = parse_request_body(self)
         if not data: return
@@ -87,6 +117,8 @@ class OrdersHandler(tornado.web.RequestHandler):
         cart_id = data['cart_id']
         ret = model.orders(cart_id, token)
         errcode = ret['err']
+        sys.stderr.write('token=%s, cartid=%s, errcode=%d\n'%(token, cart_id, errcode))
+        sys.stderr.flush()
         if errcode == 0:
             self.write({"id": ret['order_id']})
         elif errcode == -1:
@@ -108,7 +140,8 @@ if __name__ == "__main__":
 
     app = tornado.web.Application([
         (r'/login', LoginHandler),
-        (r'/carts(?P<suffix>/(?P<cartid>[0-9a-zA-Z]+)\S+)?', CartsHandler),
+        (r'/carts', CartsPostHandler),
+        (r'/carts/(.*)', CartsHandler),
         (r'/foods', FoodsHandler),
         (r'/orders', OrdersHandler)
     ], debug=True)

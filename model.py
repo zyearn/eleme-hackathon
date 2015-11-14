@@ -6,14 +6,21 @@ import string
 import pymysql
 import pymysql.cursors
 import const
-import orderslua
+
+TOKEN_LENGTH = 8
 
 r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"), 
                       port=os.getenv("REDIS_PORT", 6379), 
                       db=0, decode_responses=True)
 
-orders_lua = r.register_script(orderslua.orders)
-TOKEN_LENGTH = 8
+def register_lua_script(name):
+    with open('lua/%s.lua'%name) as f:
+        script = f.read()
+        func = r.register_script(script)
+    return func
+
+lua_add_food = register_lua_script('add_food')
+lua_orders = register_lua_script('orders')
 
 # sync redis from mysql
 def sync_redis_from_mysql():
@@ -82,6 +89,10 @@ def cart_create(token):
     r.set('cart:%s:user'%cartid, userid)
     return { 'cartid': cartid }
 
+def cart_add_food(token, cart_id, food_id, count):
+    res = lua_add_food(keys=[token, cart_id, food_id, count])
+    return res
+
 def is_food_exist(food_id):
     return r.sismember(const.FOOD_SET, food_id)
 
@@ -95,7 +106,7 @@ def get_food():
 
 
 def orders(cart_id, token):
-    rtn = orders_lua(keys=[cart_id, token])
+    rtn = lua_orders(keys=[cart_id, token])
     result = {'err': rtn}
     if rtn == 0:
         user_id = r.get('token:%s:user' % token)
@@ -106,4 +117,26 @@ def orders(cart_id, token):
         result['order_id'] = order_id
 
     return result
+
+def get_order(token):
+    userid = r.get('token:%s:user'%token)
+    orderid = r.get('user:%s:order'%userid)
+    if not orderid:
+        return None
+    cartid = r.hget('order:cart', orderid)
+    items = r.hgetall('cart:%s'%cartid)
+    item_arr = []
+    prices = {}
+    total = 0
+    for food, count in items.items():
+        price = int(r.hget(const.FOOD_PRICE, food))
+        f, c = int(food), int(count)
+        total += price * c
+        item_arr.append({'food_id': f, 'count': c})
+    return {
+        'userid': userid,
+        'orderid': orderid,
+        'items': item_arr,
+        'total': total
+    }
 

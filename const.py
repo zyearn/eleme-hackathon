@@ -13,6 +13,8 @@ CART_NOT_FOUND = {'code':'CART_NOT_FOUND', 'message':'篮子不存在'}
 NOT_AUTHORIZED_TO_ACCESS_CART = {'code':'NOT_AUTHORIZED_TO_ACCESS_CART', 'message':'无权限访问指定的篮子'}
 FOOD_OUT_OF_STOCK = {'code':'FOOD_OUT_OF_STOCK', 'message':'食物库存不足'}
 ORDER_OUT_OF_LIMIT = {'code':'ORDER_OUT_OF_LIMIT', 'message':'每个用户只能下一单'}
+FOOD_NOT_FOUND = {"code": "FOOD_NOT_FOUND", "message": "食物不存在"}
+FOOD_OUT_OF_LIMIT = {"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数量超过了三个"}
 
 ### const key name
 FOOD_STOCK = 'food:stock'
