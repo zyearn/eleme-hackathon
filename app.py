@@ -117,8 +117,6 @@ class OrdersHandler(tornado.web.RequestHandler):
         cart_id = data['cart_id']
         ret = model.orders(cart_id, token)
         errcode = ret['err']
-        sys.stderr.write('token=%s, cartid=%s, errcode=%d\n'%(token, cart_id, errcode))
-        sys.stderr.flush()
         if errcode == 0:
             self.write({"id": ret['order_id']})
         elif errcode == -1:
