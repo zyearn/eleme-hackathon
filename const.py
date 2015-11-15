@@ -10,6 +10,7 @@ MALFORMED_JSON = {'code':'MALFORMED_JSON', 'message':'格式错误'}
 
 ### transfer redis to mysql initialization key
 INIT_TIME = 'INIT_TIME'
+REDIS_BASETIME = 1447587580
 
 ### error code for orders
 CART_NOT_FOUND = {'code':'CART_NOT_FOUND', 'message':'篮子不存在'}
@@ -21,4 +22,5 @@ FOOD_OUT_OF_LIMIT = {"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数
 
 ### const key name
 FOOD_STOCK = 'food:stock'
+FOOD_LAST_UPDATE_TIME = 'food:last_update_time'
 

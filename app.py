@@ -115,7 +115,7 @@ class OrdersHandler(tornado.web.RequestHandler):
         if not data: return
 
         cart_id = data['cart_id']
-        ret = model.orders(cart_id, token)
+        ret = model.place_order(cart_id, token)
         errcode = ret['err']
         if errcode == 0:
             self.write({"id": ret['order_id']})

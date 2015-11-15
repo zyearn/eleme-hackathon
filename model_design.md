@@ -10,7 +10,8 @@ cart:<cartid>:user              <userid>
 cart:<cartid>                   {<foodid>: <cnt> }
 order:<orderid>:user            <userid>
 order:cart                      {<order>: <cart>}
-food:stock                      {<foodid> : <stock>}
+food:stock                      ordered set
+food:last_update_time           <last_update_time>
 ```
 
 ## Sync with MySQL

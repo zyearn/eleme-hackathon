@@ -5,8 +5,10 @@ import random
 import string
 import pymysql
 import pymysql.cursors
-import const
 import time
+import math
+
+import const
 
 TOKEN_LENGTH = 8
 
@@ -14,7 +16,9 @@ r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"),
                       port=os.getenv("REDIS_PORT", 6379), 
                       db=0, decode_responses=True)
 
+cache_food_last_update_time = 0
 cache_food_price = {}
+cache_food_stock = {}
 cache_userid = {}
 cache_user = {}
 
@@ -25,7 +29,8 @@ def register_lua_script(name):
     return func
 
 lua_add_food = register_lua_script('add_food')
-lua_orders = register_lua_script('orders')
+lua_place_order = register_lua_script('place_order')
+lua_query_stock = register_lua_script('query_stock')
 
 # sync redis from mysql
 def sync_redis_from_mysql():
@@ -55,6 +60,10 @@ def sync_redis_from_mysql():
 
     with mysqlconn.cursor() as cursor:
         p = r.pipeline()
+        sec, milli = map(float, r.time())
+        now = (sec-const.REDIS_BASETIME) * 1000 + math.floor(milli / 1000)
+        global cache_food_last_update_time
+        cache_food_last_update_time = now
 
         cursor.execute("select id,name,password from user")
         results = cursor.fetchall()
@@ -69,8 +78,10 @@ def sync_redis_from_mysql():
             id, stock, price = result['id'], result['stock'], result['price']
 
             cache_food_price[id] = price
-            p.hset(const.FOOD_STOCK, id, stock)
-
+            cache_food_stock[id] = stock
+            score = now * 10000000 + id * 10000 + stock
+            p.zadd(const.FOOD_STOCK, score, score)
+            p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
         p.execute()
     r.set(const.INIT_TIME, -10000)
 
@@ -111,15 +122,23 @@ def is_food_exist(food_id):
     return int(food_id) in cache_food_price
 
 def get_food():
-    food_stock = r.hgetall(const.FOOD_STOCK)
+    global cache_food_last_update_time
+    stock_delta = lua_query_stock(keys=[cache_food_last_update_time])
+    cache_food_last_update_time = stock_delta[1]
+    for i in range(2, len(stock_delta), 2):
+        id = int(stock_delta[i])
+        stock = int(stock_delta[i+1])
+        cache_food_stock[id] = stock
     return [{
-        'id':int(k), 
-        'price':int(cache_food_price[k]), 
-        'stock':int(food_stock['%d'%k])
+        'id': k,
+        'price': cache_food_price[k],
+        'stock': cache_food_stock[k]
     } for k in cache_food_price]
 
-def orders(cart_id, token):
-    rtn = lua_orders(keys=[cart_id, token])
+def place_order(cart_id, token):
+    sec, milli = map(float, r.time())
+    now = (sec-const.REDIS_BASETIME) * 1000 + math.floor(milli / 1000)
+    rtn = lua_place_order(keys=[cart_id, token, now])
     result = {'err': rtn}
     if rtn == 0:
         user_id = r.get('token:%s:user' % token)
