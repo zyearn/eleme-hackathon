@@ -161,7 +161,7 @@ if __name__ == "__main__":
         (r'/foods', FoodsHandler),
         (r'/orders', OrdersHandler),
         (r'/admin/orders', AdminOrdersHandler)
-    ], debug=True)
+    ], debug=const.DEBUG)
 
     host = os.getenv("APP_HOST", "localhost")
     port = int(os.getenv("APP_PORT", "8080"))

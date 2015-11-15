@@ -14,6 +14,10 @@ r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"),
                       port=os.getenv("REDIS_PORT", 6379), 
                       db=0, decode_responses=True)
 
+cache_food_price = {}
+cache_userid = {}
+cache_user = {}
+
 def register_lua_script(name):
     with open('lua/%s.lua'%name) as f:
         script = f.read()
@@ -25,6 +29,12 @@ lua_orders = register_lua_script('orders')
 
 # sync redis from mysql
 def sync_redis_from_mysql():
+    if const.DEBUG:
+        sys.stderr.write('WARNING! DEBUG MODE! Remember to set `const.DEBUG = False` in production!\n')
+        sys.stderr.write('                     Redis FLUSHALL\n')
+        sys.stderr.flush()
+        r.flushall()
+
     if r.incr(const.INIT_TIME) == 1:
         sys.stderr.write("ready to init redis\n")
         sys.stderr.flush()
@@ -49,16 +59,17 @@ def sync_redis_from_mysql():
         cursor.execute("select id,name,password from user")
         results = cursor.fetchall()
         for result in results:
-            p.set('username:%s:password'%result['name'], result['password'])
-            p.set('username:%s:userid'%result['name'], result['id'])
+            id, name, pwd = result['id'], result['name'], result['password']
+            cache_user[id] = { 'id': id, 'name': name, 'password': pwd }
+            cache_userid[name] = id
 
         cursor.execute("select id,stock,price from food")
         results = cursor.fetchall()
-        p.delete(const.FOOD_SET)
         for result in results:
-            p.hset(const.FOOD_STOCK, result['id'], result['stock'])
-            p.hset(const.FOOD_PRICE, result['id'], result['price'])
-            p.sadd(const.FOOD_SET, result['id'])
+            id, stock, price = result['id'], result['stock'], result['price']
+
+            cache_food_price[id] = price
+            p.hset(const.FOOD_STOCK, id, stock)
 
         p.execute()
     r.set(const.INIT_TIME, -10000)
@@ -69,9 +80,9 @@ def random_string(length=TOKEN_LENGTH):
 
 # login
 def login(username, password):
-    userid = r.get('username:%s:userid' % username)
-    pwd = r.get('username:%s:password' % username)
-    if not userid or password != pwd:
+    userid = cache_userid.get(username, None)
+    pwd = cache_user[userid]['password'] if userid != None else None
+    if userid == None or password != pwd:
         return { 'err': const.INCORRECT_PASSWORD }
 
     token = random_string(TOKEN_LENGTH)
@@ -90,20 +101,22 @@ def cart_create(token):
     return { 'cartid': cartid }
 
 def cart_add_food(token, cart_id, food_id, count):
-    res = lua_add_food(keys=[token, cart_id, food_id, count])
+    if is_food_exist(food_id):
+        res = lua_add_food(keys=[token, cart_id, food_id, count])
+    else:
+        res = -2
     return res
 
 def is_food_exist(food_id):
-    return r.sismember(const.FOOD_SET, food_id)
+    return int(food_id) in cache_food_price
 
 def get_food():
-    food_price = r.hgetall(const.FOOD_PRICE)
     food_stock = r.hgetall(const.FOOD_STOCK)
-    result = []
-    for (k,v), (k2,v2) in zip(food_price.items(), food_stock.items()):
-        result.append({'id':int(k), 'price':int(v), 'stock':int(v2)})
-    return result
-
+    return [{
+        'id':int(k), 
+        'price':int(cache_food_price[k]), 
+        'stock':int(food_stock['%d'%k])
+    } for k in cache_food_price]
 
 def orders(cart_id, token):
     rtn = lua_orders(keys=[cart_id, token])
@@ -129,8 +142,8 @@ def get_order(token):
     prices = {}
     total = 0
     for food, count in items.items():
-        price = int(r.hget(const.FOOD_PRICE, food))
         f, c = int(food), int(count)
+        price = cache_food_price[f]
         total += price * c
         item_arr.append({'food_id': f, 'count': c})
     return {

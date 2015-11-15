@@ -1,3 +1,6 @@
+DEBUG = True
+
+
 INCORRECT_PASSWORD = '## INCORRECT_PASSWORD'
 
 USER_AUTH_FAIL = {'code':'USER_AUTH_FAIL', 'message':'用户名或密码错误'}
@@ -18,6 +21,4 @@ FOOD_OUT_OF_LIMIT = {"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数
 
 ### const key name
 FOOD_STOCK = 'food:stock'
-FOOD_PRICE = 'food:price'
-FOOD_SET = 'food_set'
 

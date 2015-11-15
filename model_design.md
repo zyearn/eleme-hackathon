@@ -11,19 +11,11 @@ cart:<cartid>                   {<foodid>: <cnt> }
 order:<orderid>:user            <userid>
 order:cart                      {<order>: <cart>}
 food:stock                      {<foodid> : <stock>}
-food:price                      {<foodid> : <price>}
-food_set                        {<foodid1>, <foodid2>, ... } //SET
-username:<username>:userid      <userid>
-username:<username>:password    <password>
 ```
 
 ## Sync with MySQL
 
 ```
 food:stock
-food:price
-food_set
-username:<username>:userid
-username:<username>:password
 ```
 
