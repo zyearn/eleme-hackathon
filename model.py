@@ -31,7 +31,7 @@ def sync_redis_from_mysql():
     else:
         sys.stderr.write("redis has already been init\n")
         sys.stderr.flush()
-        while int(r.get(const.INIT_TIME)) != -1:
+        while int(r.get(const.INIT_TIME)) >= 1:
             time.sleep(0.1)
         return
 
@@ -61,7 +61,7 @@ def sync_redis_from_mysql():
             p.sadd(const.FOOD_SET, result['id'])
 
         p.execute()
-    r.set(const.INIT_TIME, -1)
+    r.set(const.INIT_TIME, -1000)
 
 # generate random string
 def random_string(length=TOKEN_LENGTH):
