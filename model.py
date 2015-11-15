@@ -19,6 +19,7 @@ r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"),
 cache_food_last_update_time = 0
 cache_food_price = {}
 cache_food_stock = {}
+cache_token_user = {}
 cache_userid = {}
 cache_user = {}
 
@@ -98,15 +99,24 @@ def login(username, password):
 
     token = random_string(TOKEN_LENGTH)
     r.set('token:%s:user'%token, userid)
+    cache_token_user[token] = userid
     return { 'userid': userid, 'token': token }
+
+def get_token_user(token):
+    if token in cache_token_user:
+        return cache_token_user[token]
+    uid = r.get('token:%s:user'%token)
+    if uid:
+        cache_token_user[token] = uid
+    return uid
 
 # check access_token
 def is_token_exist(token):
-    return r.exists('token:%s:user'%token)
+    return get_token_user(token)
 
 # create cart
 def cart_create(token):
-    userid = r.get('token:%s:user'%token)
+    userid = get_token_user(token)
     cartid = random_string(TOKEN_LENGTH)
     r.set('cart:%s:user'%cartid, userid)
     return { 'cartid': cartid }
@@ -141,7 +151,7 @@ def place_order(cart_id, token):
     rtn = lua_place_order(keys=[cart_id, token, now])
     result = {'err': rtn}
     if rtn == 0:
-        user_id = r.get('token:%s:user' % token)
+        user_id = get_token_user(token)
         order_id = random_string()
         r.set('user:%s:order' % str(user_id), order_id)
         r.set('order:%s:user' % order_id, user_id)
@@ -151,7 +161,7 @@ def place_order(cart_id, token):
     return result
 
 def get_order(token):
-    userid = r.get('token:%s:user'%token)
+    userid = get_token_user(token)
     orderid = r.get('user:%s:order'%userid)
     if not orderid:
         return None
