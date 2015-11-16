@@ -58,12 +58,10 @@ def sync_redis_from_mysql():
                                autocommit=True)
 
     now = 0
-<<<<<<< HEAD
 
     with mysqlconn.cursor() as cursor:
         p = r.pipeline()
         sec, milli = map(float, r.time())
-=======
     global lua_add_food, lua_place_order, lua_query_stock
     lua_add_food = register_lua_script('add_food')
     lua_place_order = register_lua_script('place_order')
@@ -71,7 +69,6 @@ def sync_redis_from_mysql():
 
     with mysqlconn.cursor() as cursor:
         p = r.pipeline()
->>>>>>> [Buggy] Change the implementation of food:stock
         global cache_food_last_update_time
         cache_food_last_update_time = 0
 
@@ -90,13 +87,8 @@ def sync_redis_from_mysql():
             cache_food_price[id] = price
             cache_food_stock[id] = stock
             p.zadd(const.FOOD_STOCK_KIND, now, id)
-<<<<<<< HEAD
             p.zadd(const.FOOD_STOCK_COUNT, now, stock)
             p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
-=======
-            p.zadd(const.FOOD_STOCK_COUNT, now, int(stock))
-            p.hset(const.FOOD_LAST_UPDATE_TIME, id, int(now))
->>>>>>> [Buggy] Change the implementation of food:stock
         p.set(const.TIMESTAMP, now)
         p.execute()
 
@@ -163,11 +155,7 @@ def place_order(cart_id, token):
     order_id = random_string()
     rtn = lua_place_order(keys=[cart_id, order_id, token])
     result = {'err': rtn}
-<<<<<<< HEAD
-    sys.stderr.write(rtn)
-=======
     if rtn: sys.stderr.write(rtn)
->>>>>>> [Buggy] Change the implementation of food:stock
     if rtn == 0:
         result['order_id'] = order_id
 
