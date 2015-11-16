@@ -1,6 +1,6 @@
 -- KEYS[1]: cart_id
--- KEYS[2]: access_token
--- KEYS[3]: time_now
+-- KEYS[2]: order_id
+-- KEYS[3]: access_token
 -- 
 -- return  0: OK
 -- return -1: CART_NOT_FOUND
@@ -13,9 +13,7 @@
 -- 864000000     100     1000   = 10 days <
 -- 900719925     474     0992   = 2^53
 
-local BASETIME = 1447587580
-
-local user_id = redis.call('get', 'token:'..KEYS[2]..':user')
+local user_id = redis.call('get', 'token:'..KEYS[3]..':user')
 local belong_user = redis.call('get', 'cart:'..KEYS[1]..':user')
 if not belong_user then
     return -1
@@ -38,36 +36,41 @@ for i = 1, #cart_items, 2 do
     local count = tonumber(cart_items[i+1])
 
     local time_last_update = redis.call('hget', 'food:last_update_time', id)
-    local lef = time_last_update * 10000000 + id * 10000
-    local rig = lef + 9999
-    local records = redis.call('zrangebyscore', 'food:stock', lef, rig)
+    if time_last_update ~= nil then
+            local records = redis.call('zrangebyscore', 'food:stock:count', time_last_update, time_last_update)
 
-    local stock = tonumber(records[1]) % 10000
-    local remain = stock - count
-    if remain < 0 then
-        return -3
+            local stock = tonumber(records[1])
+            -- FIXME Stock might be nil!
+            if stock == nil then
+                    return 
+            end
+            local remain = stock - count
+            if remain < 0 then
+                    return -3
+            end
+
+            tb[n] = id
+            tb[n+1] = remain
+            tb[n+2] = time_last_update
+            n = n + 3
     end
-
-    tb[n] = id
-    tb[n+1] = remain
-    tb[n+2] = lef
-    tb[n+3] = rig
-    n = n + 4
 end
 
--- local time_redis = redis.call('time')
--- local time_now = (time_redis[1]-BASETIME) * 1000 + math.floor(time_redis[2] / 1000)
-local time_now = tonumber(KEYS[3])
-
-for i = 1, #tb, 4 do
+for i = 1, #tb, 3 do
     local id = tb[i]
     local remain = tb[i+1]
-    local lef = tb[i+2]
-    local rig = tb[i+3]
-    local score = time_now * 10000000 + id * 10000 + remain
-    redis.call('zremrangebyscore', 'food:stock', lef, rig)
-    redis.call('zadd', 'food:stock', score, score)
-    redis.call('hset', 'food:last_update_time', id, time_now)
+    time_last_update = tb[i+2]
+    local timestamp = tonumber(redis.call('incr', 'timestamp'))
+    redis.call('zremrangebyscore', 'food:stock:count', time_last_update, time_last_update)
+    redis.call('zremrangebyscore', 'food:stock:kind', time_last_update, time_last_update)
+    redis.call('zadd', 'food:stock:count', timestamp, remain)
+    redis.call('zadd', 'food:stock:kind' , timestamp, id)
+    redis.call('hset', 'food:last_update_time', id, timestamp)
 end
+
+redis.call('set', 'user:'..user_id..':order', order_id)
+redis.call('set', 'order:'..order_id..':user', user_id)
+redis.call('hset', 'order:cart', order_id, cart_id)
+
 
 return 0

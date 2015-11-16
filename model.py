@@ -59,10 +59,11 @@ def sync_redis_from_mysql():
                                cursorclass=pymysql.cursors.DictCursor,
                                autocommit=True)
 
+    now = 0
+
     with mysqlconn.cursor() as cursor:
         p = r.pipeline()
         sec, milli = map(float, r.time())
-        now = (sec-const.REDIS_BASETIME) * 1000 + math.floor(milli / 1000)
         global cache_food_last_update_time
         cache_food_last_update_time = now
 
@@ -77,14 +78,14 @@ def sync_redis_from_mysql():
         results = cursor.fetchall()
         for result in results:
             id, stock, price = result['id'], result['stock'], result['price']
-
+            now += 1
             cache_food_price[id] = price
             cache_food_stock[id] = stock
-            score = now * 10000000 + id * 10000 + stock
-            p.zadd(const.FOOD_STOCK, score, score)
+            p.zadd(const.FOOD_STOCK_KIND, now, id)
+            p.zadd(const.FOOD_STOCK_COUNT, now, stock)
             p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
+        p.set(const.TIMESTAMP, now)
         p.execute()
-    r.set(const.INIT_TIME, -10000)
 
 # generate random string
 def random_string(length=TOKEN_LENGTH):
@@ -146,16 +147,11 @@ def get_food():
     } for k in cache_food_price]
 
 def place_order(cart_id, token):
-    sec, milli = map(float, r.time())
-    now = (sec-const.REDIS_BASETIME) * 1000 + math.floor(milli / 1000)
-    rtn = lua_place_order(keys=[cart_id, token, now])
+    order_id = random_string()
+    rtn = lua_place_order(keys=[cart_id, order_id, token])
     result = {'err': rtn}
+    sys.stderr.write(rtn)
     if rtn == 0:
-        user_id = get_token_user(token)
-        order_id = random_string()
-        r.set('user:%s:order' % str(user_id), order_id)
-        r.set('order:%s:user' % order_id, user_id)
-        r.hset('order:cart', order_id, cart_id)
         result['order_id'] = order_id
 
     return result

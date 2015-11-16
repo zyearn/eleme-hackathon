@@ -3,3 +3,4 @@ tornado
 pytest
 pymysql
 redis
+greenlet
