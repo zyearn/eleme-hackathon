@@ -149,7 +149,8 @@ class AdminOrdersHandler(tornado.web.RequestHandler):
             })
             self.write(json.dumps(ret))
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+if True:
     model.sync_redis_from_mysql()
     sys.stderr.write("start serving\n")
     sys.stderr.flush()
