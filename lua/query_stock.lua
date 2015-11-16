@@ -5,7 +5,7 @@
 -- 864000000     100     1000   = 10 days <
 -- 900719925     474     0992   = 2^53
 
-local BASETIME = 1447587580
+local BASETIME = 1447688623
 
 local time_last_update = tonumber(KEYS[1], 10)
 local lef = time_last_update * 10000000

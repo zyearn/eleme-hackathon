@@ -13,7 +13,7 @@
 -- 864000000     100     1000   = 10 days <
 -- 900719925     474     0992   = 2^53
 
-local BASETIME = 1447587580
+local BASETIME = 1447688623
 
 local user_id = redis.call('get', 'token:'..KEYS[2]..':user')
 local belong_user = redis.call('get', 'cart:'..KEYS[1]..':user')

@@ -1,5 +1,6 @@
 redlock-py
-tornado
-pytest
+aiohttp
 pymysql
 redis
+hiredis
+asyncio_redis
