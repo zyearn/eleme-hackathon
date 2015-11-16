@@ -1,7 +1,9 @@
 *.log
 .vagrant/
 *.pyc
-tests/.cache/
-tests/__pycache__/
+*/.cache/
+*/__pycache__/
 *.swp
 *.prof
+*.lprof
+.DS_Store
