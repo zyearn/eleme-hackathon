@@ -1,3 +1,4 @@
+setuptools
 redlock-py
 tornado
 pytest
