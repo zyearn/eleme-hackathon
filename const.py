@@ -26,3 +26,4 @@ FOOD_LAST_UPDATE_TIME = 'food:last_update_time'
 FOOD_STOCK_COUNT = 'food:stock:count'
 
 TIMESTAMP = 'timestamp'
+TIME_BASE = 10000000

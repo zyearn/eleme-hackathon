@@ -11,7 +11,7 @@ local records_count = redis.call('zrangebyscore', 'food:stock:count', time_last_
 
 local stocks = {}
 for i = 1, #records_kind, 1 do
-        stocks[ tonumber(records_kind[i]) ] = stocks[ records_count[i]]
+        stocks[ tonumber(records_kind[i]) % 10000000 ] = stocks[ tonumber(records_count[i]) % 10000000]
 end
 
 local time_latest = tonumber(redis.call('get', 'timestamp'))

@@ -86,8 +86,8 @@ def sync_redis_from_mysql():
             now += 1
             cache_food_price[id] = price
             cache_food_stock[id] = stock
-            p.zadd(const.FOOD_STOCK_KIND, now, id)
-            p.zadd(const.FOOD_STOCK_COUNT, now, stock)
+            p.zadd(const.FOOD_STOCK_KIND, now, now*const.TIME_BASE + id)
+            p.zadd(const.FOOD_STOCK_COUNT, now, now* const.TIME_BASE + stock)
             p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
         p.set(const.TIMESTAMP, now)
         p.execute()
@@ -155,7 +155,6 @@ def place_order(cart_id, token):
     order_id = random_string()
     rtn = lua_place_order(keys=[cart_id, order_id, token])
     result = {'err': rtn}
-    if rtn: sys.stderr.write(rtn)
     if rtn == 0:
         result['order_id'] = order_id
 
