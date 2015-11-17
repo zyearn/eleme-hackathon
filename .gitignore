@@ -1,0 +1,9 @@
+*.log
+.vagrant/
+*.pyc
+*.cache/
+*__pycache__/
+*.swp
+*.prof
+*.lprof
+.DS_Store
