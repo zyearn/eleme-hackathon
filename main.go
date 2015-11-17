@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+    "./src/model"
 )
 
 func main() {
+    model.Sync_redis_from_mysql()
 	host := os.Getenv("APP_HOST")
 	port := os.Getenv("APP_PORT")
 	if host == "" {

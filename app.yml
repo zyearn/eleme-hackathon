@@ -1,3 +1,6 @@
 language: go
 script:
+    - export GOPATH=`pwd`
+    - go get gopkg.in/redis.v3
+    - go get github.com/go-sql-driver/mysql
     - go run main.go
