@@ -5,7 +5,6 @@
 -- 
 -- return  0: OK
 -- return -1: CART_NOT_FOUND
--- return -2: FOOD_NOT_FOUND
 -- return -3: FOOD_OUT_OF_LIMIT
 -- return -4: NOT_AUTHORIZED_TO_ACCESS_CART
 
@@ -15,20 +14,16 @@ if not cart_user then
     return -1
 end
 if cart_user == belong_user then
-    if redis.call('sismember', 'food_set', KEYS[3]) == 1 then
-        local origin = redis.call('hgetall', 'cart:'..KEYS[2]);
-        local sum = 0;
-        for i = 2,#origin, 2 do
-            sum = sum + origin[i]
-        end
-        if sum + KEYS[4] > 3 then
-            return -3;
-        end
-        redis.call('hincrby', 'cart:'..KEYS[2], KEYS[3], KEYS[4])
-        return 0
-    else
-        return -2
+    local origin = redis.call('hgetall', 'cart:'..KEYS[2]);
+    local sum = 0;
+    for i = 2,#origin, 2 do
+        sum = sum + origin[i]
     end
+    if sum + KEYS[4] > 3 then
+        return -3;
+    end
+    redis.call('hincrby', 'cart:'..KEYS[2], KEYS[3], KEYS[4])
+    return 0
 else
     return -4
 end

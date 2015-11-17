@@ -1,3 +1,6 @@
+DEBUG = True
+
+
 INCORRECT_PASSWORD = '## INCORRECT_PASSWORD'
 
 USER_AUTH_FAIL = {'code':'USER_AUTH_FAIL', 'message':'用户名或密码错误'}
@@ -7,6 +10,7 @@ MALFORMED_JSON = {'code':'MALFORMED_JSON', 'message':'格式错误'}
 
 ### transfer redis to mysql initialization key
 INIT_TIME = 'INIT_TIME'
+REDIS_BASETIME = 1447688623
 
 ### error code for orders
 CART_NOT_FOUND = {'code':'CART_NOT_FOUND', 'message':'篮子不存在'}
@@ -17,7 +21,9 @@ FOOD_NOT_FOUND = {"code": "FOOD_NOT_FOUND", "message": "食物不存在"}
 FOOD_OUT_OF_LIMIT = {"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数量超过了三个"}
 
 ### const key name
-FOOD_STOCK = 'food:stock'
-FOOD_PRICE = 'food:price'
-FOOD_SET = 'food_set'
+FOOD_STOCK_KIND = 'food:stock:kind'
+FOOD_LAST_UPDATE_TIME = 'food:last_update_time'
+FOOD_STOCK_COUNT = 'food:stock:count'
 
+TIMESTAMP = 'timestamp'
+TIME_BASE = 10000000

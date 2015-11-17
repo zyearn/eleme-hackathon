@@ -1,5 +1,5 @@
 redlock-py
-tornado
-pytest
+aiohttp==0.17.4
 pymysql
 redis
+asyncio_redis
