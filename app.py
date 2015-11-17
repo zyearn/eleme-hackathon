@@ -2,168 +2,174 @@
 
 import os
 import sys
-import tornado.ioloop
-import tornado.web
 import json
+import asyncio
+import asyncio_redis
+from aiohttp import web
 
 import const
 import model
 
-def parse_request_body(self):
-    if not self.request.body:
-        self.set_status(400)
-        self.write(const.EMPTY_REQUEST)
-        return False
+@asyncio.coroutine
+def parse_request_body(req):
+    body = yield from req.read() # maybe use req.json() instead?
+    if not body:
+        return web.Response(status=400, body=bytes(json.dumps(const.EMPTY_REQUEST), 'utf-8'))
 
     try:
-        data = json.loads(self.request.body.decode('utf-8'))
+        data = json.loads(body.decode('utf-8'))
     except (ValueError, KeyError, TypeError) as error:
-        self.set_status(400)
-        self.write(const.MALFORMED_JSON)
-        return False
+        return web.Response(status=400, body=bytes(json.dumps(const.MALFORMED_JSON), 'utf-8'))
 
     return data
 
 def check_token(f):
-    def wrapper(self, *arg, **kwargs):
-        t1 = self.get_argument('access_token', None)
-        t2 = self.request.headers.get('Access-Token', None)
+    def wrapper(req, *arg, **kwargs):
+        t1 = req.GET.get('access_token', None)
+        t2 = req.headers.get('Access-Token', None)
 
         if t1 or t2:
             token = t1 if t1 else t2
             if model.is_token_exist(token):
                 kwargs['token'] = token
-                f(self, *arg, **kwargs)
-                return
-        self.set_status(401)
-        self.write(const.INVALID_ACCESS_TOKEN)
+                return f(req, *arg, **kwargs)
+        return web.Response(status=401, body=bytes(json.dumps(const.INVALID_ACCESS_TOKEN), 'utf-8'))
     return wrapper
 
-class LoginHandler(tornado.web.RequestHandler):
-    def post(self):
-        data = parse_request_body(self)
-        if not data: return
+@asyncio.coroutine
+def post_login(req):
+    data = yield from parse_request_body(req)
+    if type(data) is not dict: return data
 
-        username = data['username']
-        password = data['password']
-        res = model.login(username, password)
-        
-        if 'err' in res:
-            if res['err'] == const.INCORRECT_PASSWORD:
-                self.set_status(403)
-                self.write(const.USER_AUTH_FAIL)
-            return
-        self.write({'user_id':res['userid'], 'username':username, 'access_token':res['token']})
+    username = data['username']
+    password = data['password']
+    res = yield from model.login(username, password)
+    
+    if 'err' in res:
+        if res['err'] == const.INCORRECT_PASSWORD:
+            return web.Response(status=403, body=bytes(json.dumps(const.USER_AUTH_FAIL), 'utf-8'))
+
+    resp = {'user_id':res['userid'], 'username':username, 'access_token':res['token']}
+    return web.Response(body=bytes(json.dumps(resp), 'utf-8'))
+
+@asyncio.coroutine
+@check_token
+def post_carts(req, token):
+    res = yield from model.cart_create(token)
+    resp = {'cart_id': res['cartid']}
+    return web.Response(body=bytes(json.dumps(resp), 'utf-8'))
 
 
-class CartsPostHandler(tornado.web.RequestHandler):
-    @check_token
-    def post(self, token):
-        res = model.cart_create(token)
-        self.write({'cart_id': res['cartid']})
+@asyncio.coroutine
+@check_token
+def patch_carts(req, token):
+    data = yield from parse_request_body(req)
+    if type(data) is not dict: return data
 
+    cartid = req.match_info['cartid']
 
-class CartsHandler(tornado.web.RequestHandler):
-    @check_token
-    def patch(self, cartid, token):
-        data = parse_request_body(self)
-        if not data: return
+    foodid = data['food_id']
+    count = data['count']
+    res = yield from model.cart_add_food(token, cartid, foodid, count)
+    if res == 0:
+        return web.Response(status=204, body=b'')
+    elif res == -1:
+        return web.Response(status=404, body=bytes(json.dumps(const.CART_NOT_FOUND), 'utf-8'))
+    elif res == -2:
+        return web.Response(status=404, body=bytes(json.dumps(const.FOOD_NOT_FOUND), 'utf-8'))
+    elif res == -3:
+        return web.Response(status=403, body=bytes(json.dumps(const.FOOD_OUT_OF_LIMIT), 'utf-8'))
+    else:
+        return web.Response(status=401, body=bytes(json.dumps(const.NOT_AUTHORIZED_TO_ACCESS_CART), 'utf-8'))
 
-        foodid = data['food_id']
-        count = data['count']
-        res = model.cart_add_food(token, cartid, foodid, count)
-        if res == 0:
-            self.set_status(204)
-            self.write('')
-        elif res == -1:
-            self.set_status(404)
-            self.write(const.CART_NOT_FOUND)
-        elif res == -2:
-            self.set_status(404)
-            self.write(const.FOOD_NOT_FOUND)
-        elif res == -3:
-            self.set_status(403)
-            self.write(const.FOOD_OUT_OF_LIMIT)
-        else:
-            self.set_status(401)
-            self.write(const.NOT_AUTHORIZED_TO_ACCESS_CART)
+@asyncio.coroutine
+@check_token
+def get_foods(req, token):
+    res = yield from model.get_food()
+    return web.Response(body=bytes(json.dumps(res), 'utf-8'))
 
-class FoodsHandler(tornado.web.RequestHandler):
-    @check_token
-    def get(self, token):
-        res = model.get_food()
-        self.write(json.dumps(res))
+@asyncio.coroutine
+@check_token
+def get_orders(req, token):
+    res = yield from model.get_order(token)
+    if not res:
+        return web.Response(body=bytes(json.dumps([]), 'utf-8'))
+    else:
+        ret = []
+        ret.append({
+            'id': res['orderid'],
+            'items': res['items'],
+            'total': res['total']
+        })
+        return web.Response(body=bytes(json.dumps(ret), 'utf-8'))
 
-class OrdersHandler(tornado.web.RequestHandler):
-    @check_token
-    def get(self, token):
-        res = model.get_order(token)
-        if not res:
-            self.write(json.dumps([]))
-        else:
-            ret = []
-            ret.append({
-                'id': res['orderid'],
-                'items': res['items'],
-                'total': res['total']
-            })
-            self.write(json.dumps(ret))
+@asyncio.coroutine
+@check_token
+def post_orders(req, token):
+    data = yield from parse_request_body(req)
+    if type(data) is not dict: return data
 
-    @check_token
-    def post(self, token):
-        data = parse_request_body(self)
-        if not data: return
+    cart_id = data['cart_id']
+    ret = yield from model.place_order(cart_id, token)
+    errcode = ret['err']
+    if errcode == 0:
+        resp = {"id": ret['order_id']}
+        return web.Response(body=bytes(json.dumps(resp), 'utf-8'))
+    elif errcode == -1:
+        return web.Response(status=404, body=bytes(json.dumps(const.CART_NOT_FOUND), 'utf-8'))
+    elif errcode == -2:
+        return web.Response(status=403, body=bytes(json.dumps(const.NOT_AUTHORIZED_TO_ACCESS_CART), 'utf-8'))
+    elif errcode == -3:
+        return web.Response(status=403, body=bytes(json.dumps(const.FOOD_OUT_OF_STOCK), 'utf-8'))
+    else:
+        #errcode == -4
+        return web.Response(status=403, body=bytes(json.dumps(const.ORDER_OUT_OF_LIMIT), 'utf-8'))
 
-        cart_id = data['cart_id']
-        ret = model.place_order(cart_id, token)
-        errcode = ret['err']
-        if errcode == 0:
-            self.write({"id": ret['order_id']})
-        elif errcode == -1:
-            self.set_status(404)
-            self.write(const.CART_NOT_FOUND)
-        elif errcode == -2:
-            self.set_status(403)
-            self.write(const.NOT_AUTHORIZED_TO_ACCESS_CART)
-        elif errcode == -3:
-            self.set_status(403)
-            self.write(const.FOOD_OUT_OF_STOCK)
-        else:
-            #errcode == -4
-            self.set_status(403)
-            self.write(const.ORDER_OUT_OF_LIMIT)
+@asyncio.coroutine
+@check_token
+def get_admin_orders(req, token):
+    res = yield from model.get_order(token)
+    if not res:
+        return web.Response(body=bytes(json.dumps([]), 'utf-8'))
+    else:
+        ret = []
+        ret.append({
+            'id': res['orderid'],
+            'items': res['items'],
+            'total': res['total'],
+            'user_id': res['userid']
+        })
+        return web.Response(body=bytes(json.dumps(ret), 'utf-8'))
 
-class AdminOrdersHandler(tornado.web.RequestHandler):
-    @check_token
-    def get(self, token):
-        res = model.get_order(token)
-        if not res:
-            self.write(json.dumps([]))
-        else:
-            ret = []
-            ret.append({
-                'id': res['orderid'],
-                'items': res['items'],
-                'total': res['total'],
-                'user_id': res['userid']
-            })
-            self.write(json.dumps(ret))
 
 if __name__ == "__main__":
-    model.sync_redis_from_mysql()
-    sys.stderr.write("start serving\n")
-    sys.stderr.flush()
-
-    app = tornado.web.Application([
-        (r'/login', LoginHandler),
-        (r'/carts', CartsPostHandler),
-        (r'/carts/(.*)', CartsHandler),
-        (r'/foods', FoodsHandler),
-        (r'/orders', OrdersHandler),
-        (r'/admin/orders', AdminOrdersHandler)
-    ], debug=const.DEBUG)
-
     host = os.getenv("APP_HOST", "localhost")
     port = int(os.getenv("APP_PORT", "8080"))
-    app.listen(port=port, address=host)
-    tornado.ioloop.IOLoop.current().start()
+
+    app = web.Application()
+    app.router.add_route('POST',  '/login',          post_login)
+    app.router.add_route('POST',  '/carts',          post_carts)
+    app.router.add_route('PATCH', '/carts/{cartid}', patch_carts)
+    app.router.add_route('GET',   '/foods',          get_foods)
+    app.router.add_route('GET',   '/orders',         get_orders)
+    app.router.add_route('POST',  '/orders',         post_orders)
+    app.router.add_route('GET',   '/admin/orders',   get_admin_orders)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(model.init())
+    handler = app.make_handler()
+    f = loop.create_server(handler, host, port)
+    srv = loop.run_until_complete(f)
+    print('serving on', srv.sockets[0].getsockname())
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.run_until_complete(handler.finish_connections(1.0))
+        srv.close()
+        loop.run_until_complete(model.close())
+        loop.run_until_complete(srv.wait_closed())
+        loop.run_until_complete(app.finish())
+    loop.close()
+

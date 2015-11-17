@@ -10,7 +10,7 @@ MALFORMED_JSON = {'code':'MALFORMED_JSON', 'message':'格式错误'}
 
 ### transfer redis to mysql initialization key
 INIT_TIME = 'INIT_TIME'
-REDIS_BASETIME = 1447587580
+REDIS_BASETIME = 1447688623
 
 ### error code for orders
 CART_NOT_FOUND = {'code':'CART_NOT_FOUND', 'message':'篮子不存在'}

@@ -1,7 +1,7 @@
 setuptools
 redlock-py
-tornado
-pytest
+aiohttp==0.17.4
 pymysql
 redis
 greenlet
+asyncio_redis

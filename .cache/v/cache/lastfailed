@@ -1,4 +1,0 @@
-{
-  "tests/test_orders.py::test_food_stock_consistency": true,
-  "tests/test_orders.py::test_make_order": true
-}
