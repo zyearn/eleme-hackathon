@@ -2,4 +2,6 @@ language: go
 script:
     - GOPATH=/vagrant go get gopkg.in/redis.v3
     - GOPATH=/vagrant go get github.com/go-sql-driver/mysql
+    - GOPATH=/vagrant go get github.com/ant0ine/go-json-rest/rest
+    - GOPATH=/vagrant go get github.com/bitly/go-simplejson
     - GOPATH=/vagrant go run main.go

@@ -3,14 +3,46 @@ package model
 import (
 	"../constant"
 	"database/sql"
+	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/redis.v3"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
-	//"time"
+	"time"
 )
+
+/** random string **/
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const (
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
+
+var src = rand.NewSource(time.Now().UnixNano())
+
+func RandString(n int) string {
+	b := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return string(b)
+}
+
+/** random string **/
 
 var l = log.New(os.Stderr, "", 0)
 var r = redis.NewClient(&redis.Options{
@@ -28,6 +60,7 @@ var cache_user = make(map[string]userType) //token -> UserType
 var cache_userid = make(map[string]string) //name -> id
 var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
+var cache_token_user = make(map[string]string)
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -44,6 +77,27 @@ func Load_script_from_file(filename string) string {
 	}
 	command := string(command_raw)
 	return r.ScriptLoad(command).Val()
+}
+
+func PostLogin(username string, password string) (int, string) {
+	fmt.Println("username=" + username)
+	fmt.Println("password=" + password)
+
+	user_id := cache_userid[username]
+	if user_id == "" {
+		return -1, ""
+	}
+
+	password_ := cache_user[user_id].password
+	if password != password_ {
+		return -1, ""
+	}
+
+	token := RandString(8)
+	s := fmt.Sprintf("token:%s:user", token)
+	r.Set(s, user_id, 0)
+	cache_token_user[token] = user_id
+	return 0, user_id
 }
 
 var addFood, queryStock, placeOrder string
