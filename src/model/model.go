@@ -79,25 +79,48 @@ func Load_script_from_file(filename string) string {
 	return r.ScriptLoad(command).Val()
 }
 
-func PostLogin(username string, password string) (int, string) {
-	fmt.Println("username=" + username)
-	fmt.Println("password=" + password)
+func PostLogin(username string, password string) (int, string, string) {
+	//fmt.Println("username=" + username)
+	//fmt.Println("password=" + password)
 
 	user_id := cache_userid[username]
 	if user_id == "" {
-		return -1, ""
+		return -1, "", ""
 	}
 
 	password_ := cache_user[user_id].password
 	if password != password_ {
-		return -1, ""
+		return -1, "", ""
 	}
 
 	token := RandString(8)
+	//fmt.Println("token = " + token)
 	s := fmt.Sprintf("token:%s:user", token)
 	r.Set(s, user_id, 0)
 	cache_token_user[token] = user_id
-	return 0, user_id
+	return 0, user_id, token
+}
+
+func get_token_user(token string) string {
+	if id, ok := cache_token_user[token]; ok {
+		return id
+	} else {
+		s := fmt.Sprintf("token:%s:user", token)
+		user_id := r.Get(s).Val()
+		if user_id != "" {
+			cache_token_user[token] = user_id
+		}
+
+		return user_id
+	}
+}
+
+func Is_token_exist(token string) bool {
+	if nid := get_token_user(token); nid == "" {
+		return false
+	} else {
+		return true
+	}
 }
 
 var addFood, queryStock, placeOrder string

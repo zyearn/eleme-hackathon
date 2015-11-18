@@ -15,15 +15,26 @@ import (
 	"github.com/bitly/go-simplejson"
 )
 
-func TokenChecker(inner http.Handler, pattern string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if pattern != "/login" {
-			//check token here
-		}
+func TokenChecker(r *rest.Request) (int, string) {
+	t1 := r.Header.Get("Access-Token")
+	t2 := r.URL.Query().Get("Access-Token")
 
-		inner.ServeHTTP(w, r)
-		fmt.Println("in the tokenchecker")
-	})
+	var token string
+	if t1 != "" {
+		token = t1
+	} else if t2 != "" {
+		token = t2
+	} else {
+		return -1, ""
+	}
+
+	if model.Is_token_exist(token) {
+		fmt.Println("token exist")
+		return 0, token
+	}
+
+	fmt.Println("token not exist")
+	return -1, ""
 }
 
 func Index(w rest.ResponseWriter, r *rest.Request) {
@@ -31,6 +42,7 @@ func Index(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func Login(w rest.ResponseWriter, r *rest.Request) {
+	//TokenChecker(r)
 	var data interface{}
 	rtn := parse_request_body(r, &data)
 	if rtn == 0 {
@@ -38,10 +50,10 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 		user_info, _ := simplejson.NewJson(byte_json)
 		username, _ := user_info.Get("username").String()
 		password, _ := user_info.Get("password").String()
-		rtn, user_id := model.PostLogin(username, password)
+		rtn, user_id, token := model.PostLogin(username, password)
 
 		if rtn == 0 {
-			w.WriteJson(map[string]string{"user_id": user_id, "username": username, "access_token": "xxx"})
+			w.WriteJson(map[string]string{"user_id": user_id, "username": username, "access_token": token})
 		} else {
 			w.WriteHeader(http.StatusForbidden)
 			w.WriteJson(map[string]string{"code": "USER_AUTH_FAIL", "message": "用户名或密码错误"})
