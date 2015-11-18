@@ -106,7 +106,7 @@ def sync_redis_from_mysql():
             p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
         p.set(const.TIMESTAMP, now)
         p.execute()
-    r.set(const.INIT_TIME, -1000)
+    r.set(const.INIT_TIME, -10000)
 
 @asyncio.coroutine
 def init():
