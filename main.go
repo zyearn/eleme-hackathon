@@ -3,14 +3,15 @@
 package main
 
 import (
+	"./src/model"
 	"fmt"
 	"net/http"
 	"os"
-    "./src/model"
 )
 
 func main() {
-    model.Sync_redis_from_mysql()
+	model.Sync_redis_from_mysql()
+	fmt.Println("123")
 	host := os.Getenv("APP_HOST")
 	port := os.Getenv("APP_PORT")
 	if host == "" {
