@@ -42,27 +42,7 @@ def call_lua_script(script, keys):
     result = yield from reply.return_value()
     return result
 
-def sync_redis_from_mysql():
-    # still use redis-py here
-    r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"), 
-                          port=os.getenv("REDIS_PORT", 6379), 
-                          db=0, decode_responses=True)
-    if const.DEBUG:
-        sys.stderr.write('WARNING! DEBUG MODE! Remember to set `const.DEBUG = False` in production!\n')
-        sys.stderr.write('                     Redis FLUSHALL\n')
-        sys.stderr.flush()
-        r.flushall()
-        r.script_flush()
-
-    if r.incr(const.INIT_TIME) == 1:
-        sys.stderr.write("ready to init redis\n")
-        sys.stderr.flush()
-    else:
-        sys.stderr.write("redis has already been init\n")
-        sys.stderr.flush()
-        while int(r.get(const.INIT_TIME)) >= 1:
-            time.sleep(0.1)
-        return
+def init_cache_and_redis(init_redis):
 
     mysqlconn = pymysql.connect(host=os.getenv("DB_HOST", "localhost"),
                                port=int(os.getenv("DB_PORT", 3306)),
@@ -74,16 +54,14 @@ def sync_redis_from_mysql():
 
     now = 0
 
-    with mysqlconn.cursor() as cursor:
-        p = r.pipeline()
-        sec, milli = map(float, r.time())
     global lua_add_food, lua_place_order, lua_query_stock
     lua_add_food = register_lua_script('add_food')
     lua_place_order = register_lua_script('place_order')
     lua_query_stock = register_lua_script('query_stock')
 
     with mysqlconn.cursor() as cursor:
-        p = r.pipeline()
+        if init_redis:
+            p = r.pipeline()
         global cache_food_last_update_time
         cache_food_last_update_time = 0
 
@@ -101,12 +79,42 @@ def sync_redis_from_mysql():
             now += 1
             cache_food_price[id] = price
             cache_food_stock[id] = stock
-            p.zadd(const.FOOD_STOCK_KIND, now, now*const.TIME_BASE + id)
-            p.zadd(const.FOOD_STOCK_COUNT, now, now* const.TIME_BASE + stock)
-            p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
-        p.set(const.TIMESTAMP, now)
-        p.execute()
-    r.set(const.INIT_TIME, -10000)
+            if init_redis:
+                p.zadd(const.FOOD_STOCK_KIND, now, now*const.TIME_BASE + id)
+                p.zadd(const.FOOD_STOCK_COUNT, now, now* const.TIME_BASE + stock)
+                p.hset(const.FOOD_LAST_UPDATE_TIME, id, now)
+        if init_redis:
+            p.set(const.TIMESTAMP, now)
+            p.execute()
+    if init_redis:
+        r.set(const.INIT_TIME, -10000)
+
+def sync_redis_from_mysql():
+    global r
+    r = redis.StrictRedis(host=os.getenv("REDIS_HOST", "localhost"), 
+                          port=os.getenv("REDIS_PORT", 6379), 
+                          db=0, decode_responses=True)
+
+    if const.DEBUG:
+        sys.stderr.write('WARNING! DEBUG MODE! Remember to set `const.DEBUG = False` in production!\n')
+        sys.stderr.write('                     Redis FLUSHALL\n')
+        sys.stderr.flush()
+        r.flushall()
+        r.script_flush()
+
+
+    if r.incr(const.INIT_TIME) == 1:
+        sys.stderr.write("ready to init redis\n")
+        sys.stderr.flush()
+        init_cache_and_redis(True)
+    else:
+        sys.stderr.write("redis has already been init\n")
+        sys.stderr.flush()
+        init_cache_and_redis(False)
+        # wait init process to complete
+        while int(r.get(const.INIT_TIME)) >= 1:
+            time.sleep(0.1)
+        return
 
 @asyncio.coroutine
 def init():
