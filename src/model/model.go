@@ -126,11 +126,55 @@ func Is_token_exist(token string) bool {
 	}
 }
 
-func Get_foods() {
-	n, e := queryStock.Run(r, []string{strconv.Itoa(cache_food_last_update_time)}, []string{}).Result()
-	//sd := n.([]string)
+func Get_foods() []map[string]interface{} {
+	stock_delta := queryStock.Run(r, []string{strconv.Itoa(cache_food_last_update_time)}, []string{}).Val().([]interface{})
+	cache_food_last_update_time, _ = stock_delta[1].(int)
+	for i := 2; i < len(stock_delta); i += 2 {
+		id := stock_delta[i].(string)
+		stock, _ := strconv.Atoi(stock_delta[i+1].(string))
+		cache_food_stock[id] = stock
+	}
+	var ret []map[string]interface{}
+	for k, _ := range cache_food_price {
+		food_id, _ := strconv.Atoi(k)
+		ret = append(ret, map[string]interface{}{
+			"id": food_id,
+			"price": cache_food_price[k],
+			"stock": cache_food_stock[k],
+		})
+	}
+	return ret
+}
 
-	fmt.Println(n, e)
+func GetOrder(token string) (ret map[string]interface{}, found bool) {
+	userid := get_token_user(token)
+	uid, _ := strconv.Atoi(userid)
+	orderid := r.Get(fmt.Sprintf("user:%s:order", token)).Val()
+	if orderid == "" {
+		found = false
+		return
+	}
+	found = true
+    cartid := r.HGet("order:cart", orderid).Val()
+    items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
+    var item_arr []map[string]int
+    total := 0
+    for i := 0; i < len(items); i += 2 {
+    	food := items[i]
+    	count := items[i+1]
+    	f, _ := strconv.Atoi(food)
+    	c, _ := strconv.Atoi(count)
+    	price := cache_food_price[food]
+    	total += price * c
+    	item_arr = append(item_arr, map[string]int{ "food_id": f, "count": c })
+    }
+    ret = map[string]interface{}{
+		"userid": uid,
+		"orderid": orderid,
+		"items": item_arr,
+		"total": total,
+	}
+	return
 }
 
 /** init code **/

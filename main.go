@@ -76,9 +76,55 @@ func Foods(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	model.Get_foods()
-	food_info, _ := simplejson.NewJson([]byte(`[{"id": 1,"price": 12, "stock": 99}, {"id":1}]`))
-	w.WriteJson(food_info)
+	res := model.Get_foods()
+	w.WriteJson(res)
+}
+
+func get_orders(w rest.ResponseWriter, r *rest.Request) {
+	// TODO: replace with middleware
+	rtn, token := TokenChecker(r)
+	if rtn < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		return
+	}
+
+	res, found := model.GetOrder(token)
+	if !found {
+		w.WriteJson([]interface{}{})
+		return
+	}
+	var ret []map[string]interface{}
+	ret = append(ret, map[string]interface{}{
+		"id": res["orderid"],
+		"items": res["items"],
+		"total": res["total"],
+	})
+	w.WriteJson(ret)
+}
+
+func get_admin_orders(w rest.ResponseWriter, r *rest.Request) {
+	// TODO: replace with middleware
+	rtn, token := TokenChecker(r)
+	if rtn < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		return
+	}
+
+	res, found := model.GetOrder(token)
+	if !found {
+		w.WriteJson([]interface{}{})
+		return
+	}
+	var ret []map[string]interface{}
+	ret = append(ret, map[string]interface{}{
+		"id": res["orderid"],
+		"items": res["items"],
+		"total": res["total"],
+		"user_id": res["userid"],
+	})
+	w.WriteJson(ret)
 }
 
 /* Util function */
@@ -115,6 +161,8 @@ func main() {
 		rest.Get("/", Index),
 		rest.Post("/login", Login),
 		rest.Get("/foods", Foods),
+		rest.Get("/orders", get_orders),
+		rest.Get("/admin/orders", get_admin_orders),
 	)
 	if err != nil {
 		log.Fatal(err)
