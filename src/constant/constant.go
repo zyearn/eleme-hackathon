@@ -1,5 +1,7 @@
 package constant
 
+const DEBUG = true
+
 const FOOD_STOCK_KIND = "food:stock:kind"
 const FOOD_STOCK_COUNT = "food:stock:count"
 const INIT_TIME = "INIT_TIME"

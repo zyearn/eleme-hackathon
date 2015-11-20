@@ -55,12 +55,12 @@ type userType struct {
 	id, name, password string
 }
 
-var cache_food_last_update_time = make(map[int]int)
 var cache_user = make(map[string]userType) //token -> UserType
 var cache_userid = make(map[string]string) //name -> id
 var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
+var cache_food_last_update_time int
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -70,21 +70,24 @@ func atoi(str string) int {
 	return res
 }
 
-func Load_script_from_file(filename string) string {
+var addFood, queryStock, placeOrder *redis.Script
+
+func Load_script_from_file(filename string) *redis.Script {
 	command_raw, err := ioutil.ReadFile(filename)
 	if err != nil {
 		l.Fatal("Failed to load script " + filename)
 	}
 	command := string(command_raw)
-	return r.ScriptLoad(command).Val()
+	//return r.ScriptLoad(command).Val()
+	return redis.NewScript(command)
 }
 
 func PostLogin(username string, password string) (int, string, string) {
 	//fmt.Println("username=" + username)
 	//fmt.Println("password=" + password)
 
-	user_id := cache_userid[username]
-	if user_id == "" {
+	user_id, ok := cache_userid[username]
+	if !ok {
 		return -1, "", ""
 	}
 
@@ -123,23 +126,20 @@ func Is_token_exist(token string) bool {
 	}
 }
 
-var addFood, queryStock, placeOrder string
+func Get_foods() {
+	n, e := queryStock.Run(r, []string{strconv.Itoa(cache_food_last_update_time)}, []string{}).Result()
+	//sd := n.([]string)
 
-func Sync_redis_from_mysql() {
-	/*
-		if r.Incr(constant.INIT_TIME).Val() == 1 {
-			l.Println("Ready to init redis")
-		} else {
-			l.Println("Already been init")
-			for atoi(r.Get(constant.INIT_TIME).Val()) >= 1 {
-				time.Sleep(200 * time.Millisecond)
-			}
-			return
-		}
-	*/
+	fmt.Println(n, e)
+}
+
+/** init code **/
+
+func init_cache_and_redis(init_redis bool) {
 	addFood = Load_script_from_file("src/model/lua/add_food.lua")
 	queryStock = Load_script_from_file("src/model/lua/query_stock.lua")
 	placeOrder = Load_script_from_file("src/model/lua/place_order.lua")
+	cache_food_last_update_time = 0
 	db, dberr := sql.Open("mysql",
 		os.Getenv("DB_USER")+
 			":"+
@@ -179,19 +179,43 @@ func Sync_redis_from_mysql() {
 		now += 1
 		cache_food_price[id] = price
 		cache_food_stock[id] = stock
-		p.ZAdd(constant.FOOD_STOCK_KIND,
-			redis.Z{
-				float64(now),
-				now*constant.TIME_BASE + idInt,
-			})
-		p.ZAdd(constant.FOOD_STOCK_COUNT,
-			redis.Z{
-				float64(now),
-				now*constant.TIME_BASE + stock,
-			})
-		p.HSet(constant.FOOD_LAST_UPDATE_TIME, id, strconv.Itoa(now))
+		if init_redis {
+			p.ZAdd(constant.FOOD_STOCK_KIND,
+				redis.Z{
+					float64(now),
+					now*constant.TIME_BASE + idInt,
+				})
+			p.ZAdd(constant.FOOD_STOCK_COUNT,
+				redis.Z{
+					float64(now),
+					now*constant.TIME_BASE + stock,
+				})
+			p.HSet(constant.FOOD_LAST_UPDATE_TIME, id, strconv.Itoa(now))
+		}
 	}
-	p.Set(constant.TIMESTAMP, now, 0)
-	p.Exec()
-	//r.Set(constant.INIT_TIME, -10000)
+	if init_redis {
+		p.Set(constant.TIMESTAMP, now, 0)
+		p.Set(constant.INIT_TIME, -10000, 0)
+		p.Exec()
+	}
+
 }
+
+func Sync_redis_from_mysql() {
+	if constant.DEBUG {
+		r.Del(constant.INIT_TIME)
+	}
+
+	if r.Incr(constant.INIT_TIME).Val() == 1 {
+		l.Println("Ready to init redis")
+		init_cache_and_redis(true)
+	} else {
+		l.Println("Already been init")
+		init_cache_and_redis(false)
+		for atoi(r.Get(constant.INIT_TIME).Val()) >= 1 {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+}
+
+/** init code **/

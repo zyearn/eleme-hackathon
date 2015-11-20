@@ -68,6 +68,19 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 	}
 }
 
+func Foods(w rest.ResponseWriter, r *rest.Request) {
+	rtn, _ := TokenChecker(r)
+	if rtn < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		return
+	}
+
+	model.Get_foods()
+	food_info, _ := simplejson.NewJson([]byte(`[{"id": 1,"price": 12, "stock": 99}, {"id":1}]`))
+	w.WriteJson(food_info)
+}
+
 /* Util function */
 func parse_request_body(r *rest.Request, data *interface{}) int {
 	err := json.NewDecoder(r.Body).Decode(data)
@@ -101,6 +114,7 @@ func main() {
 	router, err := rest.MakeRouter(
 		rest.Get("/", Index),
 		rest.Post("/login", Login),
+		rest.Get("/foods", Foods),
 	)
 	if err != nil {
 		log.Fatal(err)
