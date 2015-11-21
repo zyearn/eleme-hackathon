@@ -2,10 +2,10 @@ package model
 
 import (
 	"../constant"
+	_ "../github.com/go-sql-driver/mysql"
+	"../gopkg.in/redis.v3"
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
-	"gopkg.in/redis.v3"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -104,8 +104,6 @@ func PostLogin(username string, password string) (int, string, string) {
 	return 0, user_id, token
 }
 
-
-
 func get_token_user(token string) string {
 	if id, ok := cache_token_user[token]; ok {
 		return id
@@ -129,7 +127,7 @@ func Is_token_exist(token string) bool {
 }
 
 func Create_cart(token string) string {
-	cartid := RandString( 32 )
+	cartid := RandString(32)
 	r.Set(fmt.Sprintf("cart:%s:user", cartid), get_token_user(token), 0)
 	return cartid
 }
@@ -137,28 +135,28 @@ func Create_cart(token string) string {
 func Cart_add_food(token, cartid string, foodid int, count int) int {
 	foodid_s := strconv.Itoa(foodid)
 	count_s := strconv.Itoa(count)
-	num ,exist := cache_food_price[foodid_s]
+	num, exist := cache_food_price[foodid_s]
 	if !exist {
 		L.Print(foodid, " has ", num)
 		return -2
 	}
 	res, err := addFood.Run(
 		r,
-		[]string {token, cartid, foodid_s, count_s},
-		[]string{}    ).Result()
-		
-	if err!=nil {
+		[]string{token, cartid, foodid_s, count_s},
+		[]string{}).Result()
+
+	if err != nil {
 		L.Fatal(err)
 	}
-	
+
 	return int(res.(int64))
 }
 
 func Get_foods() []map[string]interface{} {
 	stock_delta := queryStock.Run(
 		r,
-		[]string { strconv.Itoa(cache_food_last_update_time) },
-		[]string{}               ).Val().([]interface{})
+		[]string{strconv.Itoa(cache_food_last_update_time)},
+		[]string{}).Val().([]interface{})
 	cache_food_last_update_time, _ = stock_delta[1].(int)
 	for i := 2; i < len(stock_delta); i += 2 {
 		id := stock_delta[i].(string)
@@ -180,7 +178,7 @@ func Get_foods() []map[string]interface{} {
 func PostOrder(cart_id string, token string) (int, string) {
 	order_id := RandString(8)
 	res, err := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Result()
-	if err!=nil {
+	if err != nil {
 		L.Fatal("Failed to post order, err:", err)
 	}
 	rtn := int(res.(int64))
@@ -240,7 +238,7 @@ func init_cache_and_redis(init_redis bool) {
 	if dberr != nil {
 		L.Fatal(dberr)
 	}
-	
+
 	if init_redis {
 		r.FlushAll()
 		r.ScriptFlush()
@@ -259,7 +257,7 @@ func init_cache_and_redis(init_redis bool) {
 				password: pwd,
 			}
 	}
-	
+
 	rows, _ = db.Query("SELECT id,stock,price from food")
 	p := r.Pipeline()
 	for rows.Next() {
@@ -270,7 +268,7 @@ func init_cache_and_redis(init_redis bool) {
 		now += 1
 		cache_food_price[id] = price
 		cache_food_stock[id] = stock
-		L.Print("adding food:",id)
+		L.Print("adding food:", id)
 		if init_redis {
 			p.ZAdd(constant.FOOD_STOCK_KIND,
 				redis.Z{
