@@ -7,4 +7,3 @@
 *.prof
 *.lprof
 .DS_Store
-pkg/
