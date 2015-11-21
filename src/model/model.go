@@ -2,10 +2,10 @@ package model
 
 import (
 	"../constant"
-	_ "../github.com/go-sql-driver/mysql"
-	"../gopkg.in/redis.v3"
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"gopkg.in/redis.v3"
 	"io/ioutil"
 	"log"
 	"math/rand"

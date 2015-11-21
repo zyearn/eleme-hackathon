@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"os"
 
-	"./src/github.com/ant0ine/go-json-rest/rest"
-	"./src/github.com/bitly/go-simplejson"
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/bitly/go-simplejson"
 )
 
 func TokenChecker(r *rest.Request) (int, string) {
