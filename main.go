@@ -86,15 +86,15 @@ func Post_carts(w rest.ResponseWriter, r *rest.Request) {
 		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
 		return
 	}
-	
+
 	cartid := model.Create_cart(token)
-	w.WriteJson(map[string]string{"cart_id" : cartid})
+	w.WriteJson(map[string]string{"cart_id": cartid})
 }
 
 func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	cartid := r.PathParam("cartid")
-	
+
 	model.L.Print("cartid is ", cartid)
 	var data interface{}
 	rtn = parse_request_body(r, &data)
@@ -105,26 +105,26 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 		count, _ := user_info.Get("count").Int()
 		model.L.Print(user_info)
 		model.L.Print("foodid is ", foodid, " count is ", count)
-		
+
 		rtn = model.Cart_add_food(token, cartid, foodid, count)
 		switch rtn {
-			case 0:
+		case 0:
 			w.WriteHeader(http.StatusNoContent)
-			case -1:
+		case -1:
 			w.WriteHeader(http.StatusNotFound)
-			w.WriteJson(map[string]string {"code" : "CART_NOT_FOUND" , "message" : "篮子不存在"})
-			case -2:
+			w.WriteJson(map[string]string{"code": "CART_NOT_FOUND", "message": "篮子不存在"})
+		case -2:
 			w.WriteHeader(http.StatusNotFound)
-			w.WriteJson(map[string]string {"code": "FOOD_NOT_FOUND", "message" : "食物不存在"})
-			case -3:
+			w.WriteJson(map[string]string{"code": "FOOD_NOT_FOUND", "message": "食物不存在"})
+		case -3:
 			w.WriteHeader(http.StatusForbidden)
-			w.WriteJson(map[string]string {"code" : "FOOD_OUT_OF_LIMIT", "message" : "篮子中食物数量超过了三个"})
-			default:
+			w.WriteJson(map[string]string{"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数量超过了三个"})
+		default:
 			w.WriteHeader(http.StatusUnauthorized)
-			w.WriteJson(map[string]string {"code" : "NOT_AUTHORIZED_TO_ACCESS_CART", "message" : "无权限访问指定的篮子"})
-			
+			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
+
 		}
-		
+
 	}
 }
 
