@@ -29,11 +29,11 @@ func TokenChecker(r *rest.Request) (int, string) {
 	}
 
 	if model.Is_token_exist(token) {
-		fmt.Println("token exist")
+		//fmt.Println("token exist")
 		return 0, token
 	}
 
-	fmt.Println("token not exist")
+	//fmt.Println("token not exist")
 	return -1, ""
 }
 
@@ -80,6 +80,48 @@ func Foods(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(res)
 }
 
+func Post_orders(w rest.ResponseWriter, r *rest.Request) {
+	rtn, token := TokenChecker(r)
+	if rtn < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		return
+	}
+
+	var data interface{}
+	rtn = parse_request_body(r, &data)
+	if rtn == 0 {
+		byte_json, _ := json.Marshal(data)
+		user_info, _ := simplejson.NewJson(byte_json)
+		cart_id, _ := user_info.Get("cart_id").String()
+		rtn, order_id := model.PostOrder(cart_id, token)
+
+		if rtn == 0 {
+			w.WriteJson(map[string]string{"id": order_id})
+		} else if rtn == -1 {
+			w.WriteHeader(http.StatusNotFound)
+			w.WriteJson(map[string]string{"code": "CART_NOT_FOUND", "message": "篮子不存在"})
+		} else if rtn == -2 {
+			w.WriteHeader(http.StatusForbidden)
+			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
+		} else if rtn == -3 {
+			w.WriteHeader(http.StatusForbidden)
+			w.WriteJson(map[string]string{"code": "FOOD_OUT_OF_STOCK", "message": "食物库存不足"})
+		} else {
+			// rtn == -4
+			w.WriteHeader(http.StatusForbidden)
+			w.WriteJson(map[string]string{"code": "ORDER_OUT_OF_LIMIT", "message": "每个用户只能下一单"})
+		}
+	} else if rtn == -1 {
+		// EOF
+		w.WriteHeader(http.StatusBadRequest)
+		w.WriteJson(map[string]string{"code": "EMPTY_REQUEST", "message": "请求体为空"})
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		w.WriteJson(map[string]string{"code": "MALFORMED_JSON", "message": "格式错误"})
+	}
+}
+
 func get_orders(w rest.ResponseWriter, r *rest.Request) {
 	// TODO: replace with middleware
 	rtn, token := TokenChecker(r)
@@ -96,7 +138,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 	}
 	var ret []map[string]interface{}
 	ret = append(ret, map[string]interface{}{
-		"id": res["orderid"],
+		"id":    res["orderid"],
 		"items": res["items"],
 		"total": res["total"],
 	})
@@ -119,9 +161,9 @@ func get_admin_orders(w rest.ResponseWriter, r *rest.Request) {
 	}
 	var ret []map[string]interface{}
 	ret = append(ret, map[string]interface{}{
-		"id": res["orderid"],
-		"items": res["items"],
-		"total": res["total"],
+		"id":      res["orderid"],
+		"items":   res["items"],
+		"total":   res["total"],
 		"user_id": res["userid"],
 	})
 	w.WriteJson(ret)
@@ -161,6 +203,7 @@ func main() {
 		rest.Get("/", Index),
 		rest.Post("/login", Login),
 		rest.Get("/foods", Foods),
+		rest.Post("/orders", Post_orders),
 		rest.Get("/orders", get_orders),
 		rest.Get("/admin/orders", get_admin_orders),
 	)

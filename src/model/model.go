@@ -15,7 +15,7 @@ import (
 )
 
 /** random string **/
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789"
 const (
 	letterIdxBits = 6                    // 6 bits to represent a letter index
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
@@ -138,12 +138,18 @@ func Get_foods() []map[string]interface{} {
 	for k, _ := range cache_food_price {
 		food_id, _ := strconv.Atoi(k)
 		ret = append(ret, map[string]interface{}{
-			"id": food_id,
+			"id":    food_id,
 			"price": cache_food_price[k],
 			"stock": cache_food_stock[k],
 		})
 	}
 	return ret
+}
+
+func PostOrder(cart_id string, token string) (int, string) {
+	order_id := RandString(8)
+	rtn := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Val().(int)
+	return rtn, order_id
 }
 
 func GetOrder(token string) (ret map[string]interface{}, found bool) {
@@ -155,24 +161,24 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 		return
 	}
 	found = true
-    cartid := r.HGet("order:cart", orderid).Val()
-    items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
-    var item_arr []map[string]int
-    total := 0
-    for i := 0; i < len(items); i += 2 {
-    	food := items[i]
-    	count := items[i+1]
-    	f, _ := strconv.Atoi(food)
-    	c, _ := strconv.Atoi(count)
-    	price := cache_food_price[food]
-    	total += price * c
-    	item_arr = append(item_arr, map[string]int{ "food_id": f, "count": c })
-    }
-    ret = map[string]interface{}{
-		"userid": uid,
+	cartid := r.HGet("order:cart", orderid).Val()
+	items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
+	var item_arr []map[string]int
+	total := 0
+	for i := 0; i < len(items); i += 2 {
+		food := items[i]
+		count := items[i+1]
+		f, _ := strconv.Atoi(food)
+		c, _ := strconv.Atoi(count)
+		price := cache_food_price[food]
+		total += price * c
+		item_arr = append(item_arr, map[string]int{"food_id": f, "count": c})
+	}
+	ret = map[string]interface{}{
+		"userid":  uid,
 		"orderid": orderid,
-		"items": item_arr,
-		"total": total,
+		"items":   item_arr,
+		"total":   total,
 	}
 	return
 }
