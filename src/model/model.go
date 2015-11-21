@@ -44,7 +44,7 @@ func RandString(n int) string {
 
 /** random string **/
 
-var l = log.New(os.Stderr, "", 0)
+var L = log.New(os.Stderr, "", 0)
 var r = redis.NewClient(&redis.Options{
 	Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password: "",
@@ -65,7 +65,7 @@ var cache_food_last_update_time int
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
 	if err != nil {
-		l.Panic(err)
+		L.Panic(err)
 	}
 	return res
 }
@@ -75,7 +75,7 @@ var addFood, queryStock, placeOrder *redis.Script
 func Load_script_from_file(filename string) *redis.Script {
 	command_raw, err := ioutil.ReadFile(filename)
 	if err != nil {
-		l.Fatal("Failed to load script " + filename)
+		L.Fatal("Failed to load script " + filename)
 	}
 	command := string(command_raw)
 	//return r.ScriptLoad(command).Val()
@@ -104,6 +104,8 @@ func PostLogin(username string, password string) (int, string, string) {
 	return 0, user_id, token
 }
 
+
+
 func get_token_user(token string) string {
 	if id, ok := cache_token_user[token]; ok {
 		return id
@@ -126,8 +128,37 @@ func Is_token_exist(token string) bool {
 	}
 }
 
+func Create_cart(token string) string {
+	cartid := RandString( 32 )
+	r.Set(fmt.Sprintf("cart:%s:user", cartid), get_token_user(token), 0)
+	return cartid
+}
+
+func Cart_add_food(token, cartid string, foodid int, count int) int {
+	foodid_s := strconv.Itoa(foodid)
+	count_s := strconv.Itoa(count)
+	num ,exist := cache_food_price[foodid_s]
+	if !exist {
+		L.Print(foodid, " has ", num)
+		return -2
+	}
+	res, err := addFood.Run(
+		r,
+		[]string {token, cartid, foodid_s, count_s},
+		[]string{}    ).Result()
+		
+	if err!=nil {
+		L.Fatal(err)
+	}
+	
+	return int(res.(int64))
+}
+
 func Get_foods() []map[string]interface{} {
-	stock_delta := queryStock.Run(r, []string{strconv.Itoa(cache_food_last_update_time)}, []string{}).Val().([]interface{})
+	stock_delta := queryStock.Run(
+		r,
+		[]string { strconv.Itoa(cache_food_last_update_time) },
+		[]string{}               ).Val().([]interface{})
 	cache_food_last_update_time, _ = stock_delta[1].(int)
 	for i := 2; i < len(stock_delta); i += 2 {
 		id := stock_delta[i].(string)
@@ -148,14 +179,18 @@ func Get_foods() []map[string]interface{} {
 
 func PostOrder(cart_id string, token string) (int, string) {
 	order_id := RandString(8)
-	rtn := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Val().(int)
+	res, err := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Result()
+	if err!=nil {
+		L.Fatal("Failed to post order, err:", err)
+	}
+	rtn := int(res.(int64))
 	return rtn, order_id
 }
 
 func GetOrder(token string) (ret map[string]interface{}, found bool) {
 	userid := get_token_user(token)
 	uid, _ := strconv.Atoi(userid)
-	orderid := r.Get(fmt.Sprintf("user:%s:order", token)).Val()
+	orderid := r.Get(fmt.Sprintf("user:%s:order", get_token_user(token))).Val()
 	if orderid == "" {
 		found = false
 		return
@@ -186,6 +221,7 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 /** init code **/
 
 func init_cache_and_redis(init_redis bool) {
+	L.Print("Actual init begins, init_redis=", init_redis)
 	addFood = Load_script_from_file("src/model/lua/add_food.lua")
 	queryStock = Load_script_from_file("src/model/lua/query_stock.lua")
 	placeOrder = Load_script_from_file("src/model/lua/place_order.lua")
@@ -202,7 +238,12 @@ func init_cache_and_redis(init_redis bool) {
 			os.Getenv("DB_NAME"))
 	defer db.Close()
 	if dberr != nil {
-		l.Fatal(dberr)
+		L.Fatal(dberr)
+	}
+	
+	if init_redis {
+		r.FlushAll()
+		r.ScriptFlush()
 	}
 
 	now := 0
@@ -218,7 +259,7 @@ func init_cache_and_redis(init_redis bool) {
 				password: pwd,
 			}
 	}
-
+	
 	rows, _ = db.Query("SELECT id,stock,price from food")
 	p := r.Pipeline()
 	for rows.Next() {
@@ -229,6 +270,7 @@ func init_cache_and_redis(init_redis bool) {
 		now += 1
 		cache_food_price[id] = price
 		cache_food_stock[id] = stock
+		L.Print("adding food:",id)
 		if init_redis {
 			p.ZAdd(constant.FOOD_STOCK_KIND,
 				redis.Z{
@@ -257,10 +299,10 @@ func Sync_redis_from_mysql() {
 	}
 
 	if r.Incr(constant.INIT_TIME).Val() == 1 {
-		l.Println("Ready to init redis")
+		L.Println("Ready to init redis")
 		init_cache_and_redis(true)
 	} else {
-		l.Println("Already been init")
+		L.Println("Already been init")
 		init_cache_and_redis(false)
 		for atoi(r.Get(constant.INIT_TIME).Val()) >= 1 {
 			time.Sleep(200 * time.Millisecond)

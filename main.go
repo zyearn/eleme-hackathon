@@ -17,7 +17,7 @@ import (
 
 func TokenChecker(r *rest.Request) (int, string) {
 	t1 := r.Header.Get("Access-Token")
-	t2 := r.URL.Query().Get("Access-Token")
+	t2 := r.URL.Query().Get("access_token")
 
 	var token string
 	if t1 != "" {
@@ -75,9 +75,57 @@ func Foods(w rest.ResponseWriter, r *rest.Request) {
 		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
 		return
 	}
-
 	res := model.Get_foods()
 	w.WriteJson(res)
+}
+
+func Post_carts(w rest.ResponseWriter, r *rest.Request) {
+	rtn, token := TokenChecker(r)
+	if rtn < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		return
+	}
+	
+	cartid := model.Create_cart(token)
+	w.WriteJson(map[string]string{"cart_id" : cartid})
+}
+
+func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
+	rtn, token := TokenChecker(r)
+	cartid := r.PathParam("cartid")
+	
+	model.L.Print("cartid is ", cartid)
+	var data interface{}
+	rtn = parse_request_body(r, &data)
+	if rtn == 0 {
+		byte_json, _ := json.Marshal(data)
+		user_info, _ := simplejson.NewJson(byte_json)
+		foodid, _ := user_info.Get("food_id").Int()
+		count, _ := user_info.Get("count").Int()
+		model.L.Print(user_info)
+		model.L.Print("foodid is ", foodid, " count is ", count)
+		
+		rtn = model.Cart_add_food(token, cartid, foodid, count)
+		switch rtn {
+			case 0:
+			w.WriteHeader(http.StatusNoContent)
+			case -1:
+			w.WriteHeader(http.StatusNotFound)
+			w.WriteJson(map[string]string {"code" : "CART_NOT_FOUND" , "message" : "篮子不存在"})
+			case -2:
+			w.WriteHeader(http.StatusNotFound)
+			w.WriteJson(map[string]string {"code": "FOOD_NOT_FOUND", "message" : "食物不存在"})
+			case -3:
+			w.WriteHeader(http.StatusForbidden)
+			w.WriteJson(map[string]string {"code" : "FOOD_OUT_OF_LIMIT", "message" : "篮子中食物数量超过了三个"})
+			default:
+			w.WriteHeader(http.StatusUnauthorized)
+			w.WriteJson(map[string]string {"code" : "NOT_AUTHORIZED_TO_ACCESS_CART", "message" : "无权限访问指定的篮子"})
+			
+		}
+		
+	}
 }
 
 func Post_orders(w rest.ResponseWriter, r *rest.Request) {
@@ -133,6 +181,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 
 	res, found := model.GetOrder(token)
 	if !found {
+		model.L.Print("Order not found")
 		w.WriteJson([]interface{}{})
 		return
 	}
@@ -142,6 +191,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 		"items": res["items"],
 		"total": res["total"],
 	})
+	model.L.Print(ret)
 	w.WriteJson(ret)
 }
 
@@ -203,6 +253,8 @@ func main() {
 		rest.Get("/", Index),
 		rest.Post("/login", Login),
 		rest.Get("/foods", Foods),
+		rest.Post("/carts", Post_carts),
+		rest.Patch("/carts/:cartid", Patch_carts),
 		rest.Post("/orders", Post_orders),
 		rest.Get("/orders", get_orders),
 		rest.Get("/admin/orders", get_admin_orders),
