@@ -10,9 +10,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/bitly/go-simplejson"
+	"runtime"
 )
 
 func TokenChecker(r *rest.Request) (int, string) {
@@ -234,6 +234,7 @@ func parse_request_body(r *rest.Request, data *interface{}) int {
 
 /* Util function */
 func main() {
+	runtime.GOMAXPROCS(2)
 	model.Sync_redis_from_mysql()
 	fmt.Println("server started")
 
