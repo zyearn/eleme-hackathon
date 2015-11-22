@@ -1,6 +1,6 @@
 package constant
 
-const DEBUG = true
+const DEBUG = false
 
 const FOOD_STOCK_KIND = "food:stock:kind"
 const FOOD_STOCK_COUNT = "food:stock:count"

@@ -95,7 +95,7 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	cartid := r.PathParam("cartid")
 
-	model.L.Print("cartid is ", cartid)
+	//model.L.Print("cartid is ", cartid)
 	var data interface{}
 	rtn = parse_request_body(r, &data)
 	if rtn == 0 {
@@ -103,8 +103,8 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 		user_info, _ := simplejson.NewJson(byte_json)
 		foodid, _ := user_info.Get("food_id").Int()
 		count, _ := user_info.Get("count").Int()
-		model.L.Print(user_info)
-		model.L.Print("foodid is ", foodid, " count is ", count)
+		//model.L.Print(user_info)
+		//model.L.Print("foodid is ", foodid, " count is ", count)
 
 		rtn = model.Cart_add_food(token, cartid, foodid, count)
 		switch rtn {
@@ -181,7 +181,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 
 	res, found := model.GetOrder(token)
 	if !found {
-		model.L.Print("Order not found")
+		//model.L.Print("Order not found")
 		w.WriteJson([]interface{}{})
 		return
 	}
@@ -191,7 +191,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 		"items": res["items"],
 		"total": res["total"],
 	})
-	model.L.Print(ret)
+	//model.L.Print(ret)
 	w.WriteJson(ret)
 }
 
