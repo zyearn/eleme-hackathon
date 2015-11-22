@@ -159,9 +159,10 @@ func Get_foods() []map[string]interface{} {
 		[]string{}).Val().([]interface{})
 	cache_food_last_update_time, _ = stock_delta[1].(int)
 	for i := 2; i < len(stock_delta); i += 2 {
-		id := stock_delta[i].(string)
-		stock, _ := strconv.Atoi(stock_delta[i+1].(string))
-		cache_food_stock[id] = stock
+		id := int(stock_delta[i].(int64))
+		stock := int(stock_delta[i+1].(int64))
+		food_id := strconv.Itoa(id)
+		cache_food_stock[food_id] = stock
 	}
 	var ret []map[string]interface{}
 	for k, _ := range cache_food_price {
