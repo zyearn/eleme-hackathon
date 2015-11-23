@@ -49,6 +49,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password: "",
 	DB:       0,
+	PoolSize: 500,
 })
 
 type userType struct {
@@ -135,9 +136,9 @@ func Create_cart(token string) string {
 func Cart_add_food(token, cartid string, foodid int, count int) int {
 	foodid_s := strconv.Itoa(foodid)
 	count_s := strconv.Itoa(count)
-	num, exist := cache_food_price[foodid_s]
+	_, exist := cache_food_price[foodid_s]
 	if !exist {
-		L.Print(foodid, " has ", num)
+		//L.Print(foodid, " has ", num)
 		return -2
 	}
 	res, err := addFood.Run(
@@ -240,11 +241,6 @@ func init_cache_and_redis(init_redis bool) {
 		L.Fatal(dberr)
 	}
 
-	if init_redis {
-		r.FlushAll()
-		r.ScriptFlush()
-	}
-
 	now := 0
 	rows, _ := db.Query("SELECT id,name,password from user")
 	for rows.Next() {
@@ -269,7 +265,7 @@ func init_cache_and_redis(init_redis bool) {
 		now += 1
 		cache_food_price[id] = price
 		cache_food_stock[id] = stock
-		L.Print("adding food:", id)
+		//L.Print("adding food:", id)
 		if init_redis {
 			p.ZAdd(constant.FOOD_STOCK_KIND,
 				redis.Z{
@@ -284,12 +280,12 @@ func init_cache_and_redis(init_redis bool) {
 			p.HSet(constant.FOOD_LAST_UPDATE_TIME, id, strconv.Itoa(now))
 		}
 	}
+
 	if init_redis {
 		p.Set(constant.TIMESTAMP, now, 0)
 		p.Set(constant.INIT_TIME, -10000, 0)
 		p.Exec()
 	}
-
 }
 
 func Sync_redis_from_mysql() {
