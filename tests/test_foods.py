@@ -21,5 +21,5 @@ def test_foods():
     for food in foods:
         assert food["id"] in food_store
         assert isinstance(food["stock"], int) and food["stock"] <= 1000
-        assert isinstance(food["price"], float) and food["price"] > 0
+        assert isinstance(food["price"], int) and food["price"] > 0
         assert food_store[food["id"]]["price"] == food["price"]

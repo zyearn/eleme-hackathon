@@ -95,6 +95,6 @@ def test_token_not_too_simple():
     # easily guessed
     for uid, tk in zip(uids, tokens):
         if str(uid) in token:
-            for i in range(10):
-                assert not _valid(token.replace(uid, str(int(uid) + i)))
-                assert not _valid(token.replace(uid, str(int(uid) - i)))
+            for i in range(1, 10):
+                assert not _valid(token.replace(str(uid), str(int(uid) + i)))
+                assert not _valid(token.replace(str(uid), str(int(uid) - i)))
