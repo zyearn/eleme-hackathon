@@ -249,7 +249,7 @@ func main() {
 	addr := fmt.Sprintf("%s:%s", host, port)
 
 	api := rest.NewApi()
-	api.Use(rest.DefaultDevStack...)
+	//api.Use(rest.DefaultDevStack...)
 	router, err := rest.MakeRouter(
 		rest.Get("/", Index),
 		rest.Post("/login", Login),
