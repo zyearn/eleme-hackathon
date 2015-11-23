@@ -1,7 +1,8 @@
 package model
 
 import (
-	"../constant"
+	//"../constant"
+	"bytes"
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -11,6 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -50,13 +52,23 @@ var r = redis.NewClient(&redis.Options{
 	Password: "",
 	DB:       0,
 })
+var db, dberr = sql.Open("mysql",
+	os.Getenv("DB_USER")+
+		":"+
+		os.Getenv("DB_PASS")+
+		"@tcp("+
+		os.Getenv("DB_HOST")+
+		":"+
+		os.Getenv("DB_PORT")+
+		")/"+
+		os.Getenv("DB_NAME"))
 
 type userType struct {
 	id, name, password string
 }
 
-var cache_user = make(map[string]userType) //token -> UserType
-var cache_userid = make(map[string]string) //name -> id
+var cache_userid_to_info = make(map[string]userType) //token -> UserType
+var cache_username_to_id = make(map[string]string)   //name -> id
 var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
@@ -86,12 +98,12 @@ func PostLogin(username string, password string) (int, string, string) {
 	//fmt.Println("username=" + username)
 	//fmt.Println("password=" + password)
 
-	user_id, ok := cache_userid[username]
+	user_id, ok := cache_username_to_id[username]
 	if !ok {
 		return -1, "", ""
 	}
 
-	password_ := cache_user[user_id].password
+	password_ := cache_userid_to_info[user_id].password
 	if password != password_ {
 		return -1, "", ""
 	}
@@ -128,130 +140,230 @@ func Is_token_exist(token string) bool {
 
 func Create_cart(token string) string {
 	cartid := RandString(32)
+
 	r.Set(fmt.Sprintf("cart:%s:user", cartid), get_token_user(token), 0)
+	//TODO: cache
 	return cartid
 }
 
 func Cart_add_food(token, cartid string, foodid int, count int) int {
 	foodid_s := strconv.Itoa(foodid)
-	count_s := strconv.Itoa(count)
 	num, exist := cache_food_price[foodid_s]
 	if !exist {
 		L.Print(foodid, " has ", num)
 		return -2
 	}
-	res, err := addFood.Run(
-		r,
-		[]string{token, cartid, foodid_s, count_s},
-		[]string{}).Result()
-
-	if err != nil {
-		L.Fatal(err)
+	//TODO: cache
+	s := fmt.Sprintf("cart:%s:user", cartid)
+	cart_user := r.Get(s).Val()
+	if cart_user == "" {
+		return -1
 	}
 
-	return int(res.(int64))
+	token_user := get_token_user(token)
+	if token_user != cart_user {
+		return -4
+	}
+
+	s = fmt.Sprintf("select sum(count) from cartfood where cartid = '%s' group by cartid", cartid)
+	fmt.Println("s = ", s)
+
+	rows, err := db.Query(s)
+	defer rows.Close()
+	if err != nil {
+		fmt.Println("select sum(count) from cartfood where cartid = %s group by cartid sql error: ", err)
+	}
+	var curSum = 0
+	if rows.Next() {
+		rows.Scan(&curSum)
+	}
+
+	if curSum+count > 3 {
+		return -3
+	}
+
+	s = fmt.Sprintf("insert into cartfood(cartid, foodid, count) values('%s', %d, %d) on duplicate key update count=count+%d;",
+		cartid, foodid, count, count)
+	r, err := db.Query(s)
+	defer r.Close()
+	if err != nil {
+		fmt.Println("insert into cartfood(cartid, foodid, count) values(%s, %s, %s) on duplicate key update count=count+%s; sql error: ", err)
+	}
+
+	return 0
 }
 
 func Get_foods() []map[string]interface{} {
-	stock_delta := queryStock.Run(
-		r,
-		[]string{strconv.Itoa(cache_food_last_update_time)},
-		[]string{}).Val().([]interface{})
-	cache_food_last_update_time, _ = stock_delta[1].(int)
-	for i := 2; i < len(stock_delta); i += 2 {
-		id := int(stock_delta[i].(int64))
-		stock := int(stock_delta[i+1].(int64))
-		food_id := strconv.Itoa(id)
-		cache_food_stock[food_id] = stock
+	rows, dberr := db.Query("SELECT id, stock from food")
+	defer rows.Close()
+
+	if dberr != nil {
+		fmt.Println("DB error,", dberr)
 	}
+
 	var ret []map[string]interface{}
-	for k, _ := range cache_food_price {
-		food_id, _ := strconv.Atoi(k)
+	var id string
+	var stock int
+
+	for rows.Next() {
+		rows.Scan(&id, &stock)
+		food_id, _ := strconv.Atoi(id)
+
 		ret = append(ret, map[string]interface{}{
 			"id":    food_id,
-			"price": cache_food_price[k],
-			"stock": cache_food_stock[k],
+			"price": cache_food_price[id],
+			"stock": stock,
 		})
 	}
 	return ret
 }
 
 func PostOrder(cart_id string, token string) (int, string) {
-	order_id := RandString(8)
-	res, err := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Result()
-	if err != nil {
-		L.Fatal("Failed to post order, err:", err)
+	order_id := RandString(16)
+
+	//TODO: cache
+	s := fmt.Sprintf("cart:%s:user", cart_id)
+	cart_user := r.Get(s).Val()
+	if cart_user == "" {
+		fmt.Println("ready to return -1")
+		return -1, ""
 	}
-	rtn := int(res.(int64))
-	return rtn, order_id
+
+	token_user := get_token_user(token)
+	if token_user != cart_user {
+		fmt.Println("ready to return -2")
+		return -2, ""
+	}
+
+	s = fmt.Sprintf("select id from userorder where userid=%s", token_user)
+	userorder, err := db.Query(s)
+	defer userorder.Close()
+	if err != nil {
+		fmt.Println("order 1 db err:", err)
+	}
+
+	if userorder.Next() {
+		fmt.Println("ready to return -4")
+		return -4, ""
+	}
+
+	s = fmt.Sprintf("select foodid,count,stock from cartfood inner join food on cartfood.foodid=food.id where cartfood.cartid = '%s'", cart_id)
+	foods_in_cart, err := db.Query(s)
+	defer foods_in_cart.Close()
+	if err != nil {
+		fmt.Println("order 2 db err:", err)
+	}
+
+	var food_id, count, stock int
+	var to_update = make(map[int]int)
+	for foods_in_cart.Next() {
+		foods_in_cart.Scan(&food_id, &count, &stock)
+		fmt.Println("count=", count, " stock=", stock)
+		if count > stock {
+			fmt.Println("ready to return -3, count=", count, " stock=", stock)
+			return -3, ""
+		}
+		to_update[food_id] = stock - count
+		fmt.Println("ready to_update,", food_id, to_update[food_id])
+	}
+
+	// update stock
+	var buffer bytes.Buffer
+	var tail bytes.Buffer
+	buffer.WriteString("update food set stock = case ")
+	for k, v := range to_update {
+		buffer.WriteString(fmt.Sprintf("when id=%d then %d ", k, v))
+		tail.WriteString(fmt.Sprintf("%d,", k))
+	}
+	buffer.WriteString("end where id in(")
+	ts := tail.String()
+	ts = strings.TrimRight(ts, ",")
+
+	qs := buffer.String() + ts + ")"
+	fmt.Println("in place order, qs = ", qs)
+
+	update, err := db.Query(qs)
+	defer update.Close()
+
+	if err != nil {
+		fmt.Println("order 3 db err:", err)
+	}
+
+	// update order
+	qs = fmt.Sprintf("insert into userorder(userid, cartid, orderid) values('%s', '%s', '%s')", token_user, cart_id, order_id)
+
+	insert, err := db.Query(qs)
+	defer insert.Close()
+
+	if err != nil {
+		fmt.Println("order 4 db err:", err)
+	}
+
+	fmt.Println("ready to return 0")
+	return 0, order_id
 }
 
 func GetOrder(token string) (ret map[string]interface{}, found bool) {
 	userid := get_token_user(token)
 	uid, _ := strconv.Atoi(userid)
-	orderid := r.Get(fmt.Sprintf("user:%s:order", get_token_user(token))).Val()
-	if orderid == "" {
-		found = false
+
+	qs := fmt.Sprintf("select userid, foodid, count from cartfood inner join userorder on cartfood.cartid = userorder.cartid where userid=%d", uid)
+	fmt.Println("in getOrder! qs=", qs)
+	orders, err := db.Query(qs)
+	defer orders.Close()
+
+	if err != nil {
+		fmt.Println("get order 1 db err:", err)
+	}
+
+	found = false
+	var item_arr []map[string]int
+	var orderid string
+	var foodid, count int
+	total := 0
+
+	for orders.Next() {
+		found = true
+		orders.Scan(&orderid, &foodid, &count)
+		fmt.Println("!!!!read from sql, order,food,count=", orderid, foodid, count)
+		price := cache_food_price[strconv.Itoa(foodid)]
+		total = total + price*count
+		fmt.Println("total=", total, "price=", price, "count=", count, "price*count=", price, "foodid=", strconv.Itoa(foodid))
+		item_arr = append(item_arr, map[string]int{"food_id": foodid, "count": count})
+	}
+
+	if !found {
 		return
 	}
-	found = true
-	cartid := r.HGet("order:cart", orderid).Val()
-	items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
-	var item_arr []map[string]int
-	total := 0
-	for i := 0; i < len(items); i += 2 {
-		food := items[i]
-		count := items[i+1]
-		f, _ := strconv.Atoi(food)
-		c, _ := strconv.Atoi(count)
-		price := cache_food_price[food]
-		total += price * c
-		item_arr = append(item_arr, map[string]int{"food_id": f, "count": c})
-	}
+
 	ret = map[string]interface{}{
 		"userid":  uid,
 		"orderid": orderid,
 		"items":   item_arr,
 		"total":   total,
 	}
+
 	return
 }
 
 /** init code **/
 
-func init_cache_and_redis(init_redis bool) {
-	L.Print("Actual init begins, init_redis=", init_redis)
-	addFood = Load_script_from_file("src/model/lua/add_food.lua")
-	queryStock = Load_script_from_file("src/model/lua/query_stock.lua")
-	placeOrder = Load_script_from_file("src/model/lua/place_order.lua")
-	cache_food_last_update_time = 0
-	db, dberr := sql.Open("mysql",
-		os.Getenv("DB_USER")+
-			":"+
-			os.Getenv("DB_PASS")+
-			"@tcp("+
-			os.Getenv("DB_HOST")+
-			":"+
-			os.Getenv("DB_PORT")+
-			")/"+
-			os.Getenv("DB_NAME"))
-	defer db.Close()
+func Init_cache() {
 	if dberr != nil {
 		L.Fatal(dberr)
 	}
 
-	if init_redis {
-		r.FlushAll()
-		r.ScriptFlush()
-	}
+	db.SetMaxOpenConns(1500)
+	db.SetMaxIdleConns(1000)
 
-	now := 0
-	rows, _ := db.Query("SELECT id,name,password from user")
+	rows, _ := db.Query("SELECT id, name, password from user")
+	defer rows.Close()
+	var id, name, pwd string
+
 	for rows.Next() {
-		var id, name, pwd string
 		rows.Scan(&id, &name, &pwd)
-		cache_userid[name] = id
-		cache_user[id] =
+		cache_username_to_id[name] = id
+		cache_userid_to_info[id] =
 			userType{
 				id:       id,
 				name:     name,
@@ -259,53 +371,14 @@ func init_cache_and_redis(init_redis bool) {
 			}
 	}
 
-	rows, _ = db.Query("SELECT id,stock,price from food")
-	p := r.Pipeline()
-	for rows.Next() {
-		var id string
-		var stock, price int
-		rows.Scan(&id, &stock, &price)
-		idInt := atoi(id)
-		now += 1
+	foods, _ := db.Query("SELECT id,stock,price from food")
+	defer foods.Close()
+
+	var stock, price int
+	for foods.Next() {
+		foods.Scan(&id, &stock, &price)
 		cache_food_price[id] = price
-		cache_food_stock[id] = stock
-		L.Print("adding food:", id)
-		if init_redis {
-			p.ZAdd(constant.FOOD_STOCK_KIND,
-				redis.Z{
-					float64(now),
-					now*constant.TIME_BASE + idInt,
-				})
-			p.ZAdd(constant.FOOD_STOCK_COUNT,
-				redis.Z{
-					float64(now),
-					now*constant.TIME_BASE + stock,
-				})
-			p.HSet(constant.FOOD_LAST_UPDATE_TIME, id, strconv.Itoa(now))
-		}
-	}
-	if init_redis {
-		p.Set(constant.TIMESTAMP, now, 0)
-		p.Set(constant.INIT_TIME, -10000, 0)
-		p.Exec()
-	}
-
-}
-
-func Sync_redis_from_mysql() {
-	if constant.DEBUG {
-		r.Del(constant.INIT_TIME)
-	}
-
-	if r.Incr(constant.INIT_TIME).Val() == 1 {
-		L.Println("Ready to init redis")
-		init_cache_and_redis(true)
-	} else {
-		L.Println("Already been init")
-		init_cache_and_redis(false)
-		for atoi(r.Get(constant.INIT_TIME).Val()) >= 1 {
-			time.Sleep(200 * time.Millisecond)
-		}
+		L.Print("adding food:", id, "price = ", price)
 	}
 }
 

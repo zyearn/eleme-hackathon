@@ -162,24 +162,41 @@ class Query(object):
         return False
 
     def login(self):
-        user_id = redis_store.spop(USER_KEY)
-        if not user_id:
+        try:
+            user_id = redis_store.spop(USER_KEY)
+            if not user_id:
+                return False
+
+            self.user_id = int(user_id)
+            user = users[self.user_id]
+            return self._do_login(user["username"], user["password"])
+        except Exception as e:
+            print("ex happens in login, ", e)
             return False
 
-        self.user_id = int(user_id)
-        user = users[self.user_id]
-        return self._do_login(user["username"], user["password"])
-
     def get_foods(self):
-        res = self.request("GET", self.url("/foods"))
-        return res["status"] == 200
+        try:
+            res = self.request("GET", self.url("/foods"))
+            return res["status"] == 200
+        except Exception as e:
+            print("ex happen in get_food, ", e)
+            return False
 
     def get_orders(self):
-        res = self.request("GET", self.url("/orders"))
-        return res["status"] == 200
+        try:
+            res = self.request("GET", self.url("/orders"))
+            return res["status"] == 200
+        except Exception as e:
+            print("ex happen in get_orders, ", e)
+            return False
 
     def create_cart(self):
-        response = self.request("POST", self.url("/carts"))
+        try:
+            response = self.request("POST", self.url("/carts"))
+        except Exception as e:
+            print("ex happen in create_cart, ", e)
+            return False
+
         try:
             self.cart_id = response["data"].get("cart_id")
         except:
@@ -187,31 +204,47 @@ class Query(object):
         return response["status"] == 200
 
     def cart_add_food(self):
-        food = random.choice(foods)
-        data = {"food_id": food["id"], "count": 1}
-        path = "/carts/{}".format(self.cart_id)
-        res = self.request("PATCH", self.url(path), data=data)
-        return res["status"] == 204
+        try:
+            food = random.choice(foods)
+            data = {"food_id": food["id"], "count": 1}
+            path = "/carts/{}".format(self.cart_id)
+            res = self.request("PATCH", self.url(path), data=data)
+            return res["status"] == 204
+        except Exception as e:
+            print("ex happen in cart_add_food, ", e)
+            return False
 
     def make_order(self):
-        chain = [self.login, self.get_foods, self.create_cart,
-                 self.cart_add_food, self.cart_add_food]
-        for action in chain:
-            if not action():
-                return False
+        try:
+            chain = [self.login, self.get_foods, self.create_cart,
+                     self.cart_add_food, self.cart_add_food]
+            i=0
+            for action in chain:
+                if not action():
+                    print("error when make_order!! i = %d\n"% i)
+                    return False
+                i = i+1
 
-        data = {"cart_id": self.cart_id}
-        res = self.request("POST", self.url("/orders"), data=data)
-        return res["status"] == 200
-
+            data = {"cart_id": self.cart_id}
+            res = self.request("POST", self.url("/orders"), data=data)
+            if res["status"] != 200:
+                print("error res status != 200, data=",data, "res = ",res["status"])
+            return res["status"] == 200
+        except Exception as e:
+            print("ex happen in make_order, ", e)
+            return False
 
 def job(host, port):
+    #ports = [8080, 8081, 8082]
+    #ports = [8080]
+    #q = Query(host, random.choice(ports))
     q = Query(host, port)
 
     start = time.time()
     try:
         ok = q.make_order()
-    except:
+    except Exception as e:
+        print("except happen: ", e)
         ok = False
 
     end = time.time()
@@ -222,6 +255,7 @@ def job(host, port):
             p.incr(SUCCESS_KEY)
             p.lpush(ORDER_FINISH_TIME_KEY, end)
         else:
+            print("ok is false!!")
             p.incr(FAILURE_KEY)
         p.lpush(ORDER_RESP_TIME_KEY, elapsed)
         p.execute()
@@ -235,8 +269,9 @@ def progress():
             cur = get_value(SUCCESS_KEY)
 
             msg = "Orders Per Second: {:4d}/s".format(cur - prev)
-            print(msg, end='')
-            print('\r' * len(msg), end='')
+            #print(msg, end='')
+            #print('\r' * len(msg), end='')
+            print("%s" % msg)
 
             prev = cur
 

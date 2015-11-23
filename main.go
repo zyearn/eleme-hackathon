@@ -105,7 +105,6 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 		count, _ := user_info.Get("count").Int()
 		//model.L.Print(user_info)
 		//model.L.Print("foodid is ", foodid, " count is ", count)
-
 		rtn = model.Cart_add_food(token, cartid, foodid, count)
 		switch rtn {
 		case 0:
@@ -122,7 +121,6 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 		default:
 			w.WriteHeader(http.StatusUnauthorized)
 			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
-
 		}
 
 	}
@@ -179,6 +177,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	fmt.Println("ready to call GetOrder")
 	res, found := model.GetOrder(token)
 	if !found {
 		//model.L.Print("Order not found")
@@ -234,7 +233,7 @@ func parse_request_body(r *rest.Request, data *interface{}) int {
 
 /* Util function */
 func main() {
-	model.Sync_redis_from_mysql()
+	model.Init_cache()
 	fmt.Println("server started")
 
 	host := os.Getenv("APP_HOST")
