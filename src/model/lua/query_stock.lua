@@ -1,10 +1,5 @@
 -- KEYS[1]: time_last_update
 
--- 123456689     012     3456
---    time   | food_id | stock
--- 864000000     100     1000   = 10 days <
--- 900719925     474     0992   = 2^53
-
 local time_last_update = tonumber(KEYS[1], 10)
 local time_latest = tonumber(redis.call('get', 'timestamp'))
 local ret = {}
@@ -14,13 +9,12 @@ ret[2] = time_latest
 if time_last_update == time_latest then
     return ret
 end
-
-local records_kind = redis.call('zrangebyscore', 'food:stock:kind', time_last_update, "+inf")
-local records_count = redis.call('zrangebyscore', 'food:stock:count', time_last_update, "+inf")
+local records = redis.call('zrangebyscore', 'food:id:stock', time_last_update, "+inf")
 
 local stocks = {}
-for i = 1, #records_kind, 1 do
-        stocks[ tonumber(records_kind[i]) % 10000000 ] = tonumber(records_count[i]) % 10000000
+for i = 1, #records, 1 do
+    local nb = tonumber(records[i])
+    stocks[ tonumber(nb / 10000) % 100000 ] = nb % 10000
 end
 
 

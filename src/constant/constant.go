@@ -2,8 +2,7 @@ package constant
 
 const DEBUG = false
 
-const FOOD_STOCK_KIND = "food:stock:kind"
-const FOOD_STOCK_COUNT = "food:stock:count"
+const FOOD_ID_STOCK = "food:id:stock"
 const INIT_TIME = "INIT_TIME"
 const TIMESTAMP = "timestamp"
 const FOOD_LAST_UPDATE_TIME = "food:last_update_time"
