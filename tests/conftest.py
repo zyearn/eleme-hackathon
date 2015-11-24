@@ -84,6 +84,7 @@ order_store = {}
 # req utils
 _session = requests.session()
 _session.headers.update({"Content-type": "application/json"})
+_session.mount("http://", requests.adapters.HTTPAdapter(max_retries=10))
 
 
 def json_get(path, tk):

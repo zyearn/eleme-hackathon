@@ -256,7 +256,7 @@ POST /orders?access_token=xxx
 篮子不属于当前用户
 
 ```
-403 Forbidden
+401 Unauthorized
 {
     "code": "NOT_AUTHORIZED_TO_ACCESS_CART",
     "message": "无权限访问指定的篮子"
