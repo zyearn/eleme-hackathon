@@ -53,7 +53,7 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 		rtn, user_id, token := model.PostLogin(username, password)
 
 		if rtn == 0 {
-			w.WriteJson(map[string]string{"user_id": user_id, "username": username, "access_token": token})
+			w.WriteJson(map[string]interface{}{"user_id": user_id, "username": username, "access_token": token})
 		} else {
 			w.WriteHeader(http.StatusForbidden)
 			w.WriteJson(map[string]string{"code": "USER_AUTH_FAIL", "message": "用户名或密码错误"})
@@ -122,9 +122,14 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 		default:
 			w.WriteHeader(http.StatusUnauthorized)
 			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
-
 		}
-
+	} else if rtn == -1 {
+		// EOF
+		w.WriteHeader(http.StatusBadRequest)
+		w.WriteJson(map[string]string{"code": "EMPTY_REQUEST", "message": "请求体为空"})
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		w.WriteJson(map[string]string{"code": "MALFORMED_JSON", "message": "格式错误"})
 	}
 }
 
@@ -150,7 +155,7 @@ func Post_orders(w rest.ResponseWriter, r *rest.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			w.WriteJson(map[string]string{"code": "CART_NOT_FOUND", "message": "篮子不存在"})
 		} else if rtn == -2 {
-			w.WriteHeader(http.StatusForbidden)
+			w.WriteHeader(http.StatusUnauthorized)
 			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
 		} else if rtn == -3 {
 			w.WriteHeader(http.StatusForbidden)
@@ -204,19 +209,8 @@ func get_admin_orders(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	res, found := model.GetOrder(token)
-	if !found {
-		w.WriteJson([]interface{}{})
-		return
-	}
-	var ret []map[string]interface{}
-	ret = append(ret, map[string]interface{}{
-		"id":      res["orderid"],
-		"items":   res["items"],
-		"total":   res["total"],
-		"user_id": res["userid"],
-	})
-	w.WriteJson(ret)
+	res := model.AdminGetOrder(token)
+	w.WriteJson(res)
 }
 
 /* Util function */
