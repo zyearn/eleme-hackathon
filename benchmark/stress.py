@@ -352,7 +352,7 @@ def report(processes, threads, total_time, total_order):
     p = functools.partial(print, sep='')
 
     p("Score:                ", max_order_sec)
-    p("Correct Rate:         ", round(success * 100.0 / total_order, 2), "%")
+    p("Correct Rate:         ", round(success / total_order * 100, 2), "%")
 
     p("\nStats")
     p("Concurrent Level:     ", processes, " x ", threads)

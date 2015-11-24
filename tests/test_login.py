@@ -50,17 +50,6 @@ def test_login_error():
     assert res.json() == {"code": "USER_AUTH_FAIL",
                           "message": u"用户名或密码错误"}
 
-def test_login_error_username(url, username):
-    data = {"username": "djkahkcuwu", "password": "nottherightpassword"}
-    res = requests.post(
-        url + "/login",
-        data=json.dumps(data),
-        headers={"Content-type": "application/json"},
-    )
-
-    assert res.status_code == 403
-    assert res.json().get("code") == "USER_AUTH_FAIL"
-    assert res.json().get("message") == u"用户名或密码错误"
 
 def test_login_post_data():
     uid = random.choice(list(user_store.keys()))
