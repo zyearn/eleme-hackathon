@@ -159,10 +159,12 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 }
 
 func Get_foods() []map[string]interface{} {
+	var ret []map[string]interface{}
 	stock_delta := queryStock.Run(
 		r,
 		[]string{strconv.Itoa(cache_food_last_update_time)},
 		[]string{}).Val().([]interface{})
+
 	cache_food_last_update_time, _ = stock_delta[1].(int)
 	for i := 2; i < len(stock_delta); i += 2 {
 		id := int(stock_delta[i].(int64))
@@ -170,7 +172,6 @@ func Get_foods() []map[string]interface{} {
 		food_id := strconv.Itoa(id)
 		cache_food_stock[food_id] = stock
 	}
-	var ret []map[string]interface{}
 
 	keys := []string{}
 	for k, _ := range cache_food_price {
@@ -312,15 +313,10 @@ func init_cache_and_redis(init_redis bool) {
 		cache_food_stock[id] = stock
 		//L.Print("adding food:", id)
 		if init_redis {
-			p.ZAdd(constant.FOOD_STOCK_KIND,
+			p.ZAdd(constant.FOOD_ID_STOCK,
 				redis.Z{
 					float64(now),
-					now*constant.TIME_BASE + idInt,
-				})
-			p.ZAdd(constant.FOOD_STOCK_COUNT,
-				redis.Z{
-					float64(now),
-					now*constant.TIME_BASE + stock,
+					now*1000000000 + idInt*10000 + stock,
 				})
 			p.HSet(constant.FOOD_LAST_UPDATE_TIME, id, strconv.Itoa(now))
 		}
