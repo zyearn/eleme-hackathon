@@ -49,10 +49,13 @@ for i = 1, #cart_items, 2 do
     tb[n] = id
     tb[n+1] = remain
     tb[n+2] = time_last_update
-    n = n + 3
+    tb[n+3] = count
+    n = n + 4
 end
 
-for i = 1, #tb, 3 do
+local order_id = KEYS[2]
+
+for i = 1, #tb, 4 do
     local id = tb[i]
     local remain = tb[i+1]
     local time_last_update = tonumber(tb[i+2])
@@ -62,13 +65,11 @@ for i = 1, #tb, 3 do
     redis.call('zadd', 'food:stock:count', timestamp, timestamp * 10000000 + remain)
     redis.call('zadd', 'food:stock:kind' , timestamp, timestamp * 10000000 + id)
     redis.call('hset', 'food:last_update_time', id, timestamp)
+    redis.call('hset', 'order:'..order_id, id, tb[i+3])
 end
 
-local order_id = KEYS[2]
 
 redis.call('set', 'user:'..user_id..':order', order_id)
-redis.call('set', 'order:'..order_id..':user', user_id)
-redis.call('hset', 'order:cart', order_id, KEYS[1])
-
+redis.call('hset', 'order:user', order_id, user_id)
 
 return 0

@@ -209,8 +209,9 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 		return
 	}
 	found = true
-	cartid := r.HGet("order:cart", orderid).Val()
-	items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
+	//cartid := r.HGet("order:cart", orderid).Val()
+	//items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
+	items := r.HGetAll(fmt.Sprintf("order:%s", orderid)).Val()
 	var item_arr []map[string]int
 	total := 0
 	for i := 0; i < len(items); i += 2 {

@@ -8,8 +8,11 @@ token:<tokenid>:user            <userid>
 user:<userid>:order             <orderid>
 cart:<cartid>:user              <userid>
 cart:<cartid>                   {<foodid>: <cnt> }
-order:<orderid>:user            <userid>
-order:cart                      {<order>: <cart>}
+//order:<orderid>:user            <userid>
+order:user                      {<orderid>: <userid>}
+
+order:<orderid>                 {<foodid>: <cnt> }
+
 food:stock:count                ordered set : <updated-time> -> <foodcount>
 food:stock:kind                 ordered set: <updated-time> -> <foodcount>
 food:last_update_time           <last_update_time>
