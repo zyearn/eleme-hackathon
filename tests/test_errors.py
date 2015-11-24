@@ -2,8 +2,10 @@
 
 import requests
 
+from conftest import url
 
-def test_empty_request_error(url, username, password):
+
+def test_empty_request_error():
     res = requests.post(
         url + "/login",
         data=None,
@@ -11,24 +13,22 @@ def test_empty_request_error(url, username, password):
     )
 
     assert res.status_code == 400
-    assert res.json().get("code") == "EMPTY_REQUEST"
-    assert res.json().get("message") == u"请求体为空"
+    assert res.json() == {"code": "EMPTY_REQUEST", "message": u"请求体为空"}
 
 
-def test_malformed_json_error(url):
+def test_malformed_json_error():
     res = requests.post(
         url + "/login",
         data="not a json request",
         headers={"Content-type": "application/json"},
     )
     assert res.status_code == 400
-    assert res.json().get("code") == "MALFORMED_JSON"
-    assert res.json().get("message") == u"格式错误"
+    assert res.json() == {"code": "MALFORMED_JSON", "message": u"格式错误"}
 
 
-def test_auth_error(url):
+def test_auth_error():
     res = requests.get(url + "/foods")
 
     assert res.status_code == 401
-    assert res.json().get("code") == "INVALID_ACCESS_TOKEN"
-    assert res.json().get("message") == u"无效的令牌"
+    assert res.json() == {"code": "INVALID_ACCESS_TOKEN",
+                          "message": u"无效的令牌"}
