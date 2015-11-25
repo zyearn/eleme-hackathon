@@ -24,11 +24,16 @@ const (
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
 
-var src = rand.NewSource(time.Now().UnixNano())
+var srcLogin = rand.NewSource(time.Now().UnixNano())
+var srcCart = rand.NewSource(time.Now().UnixNano() + 1)
+var srcOrder = rand.NewSource(time.Now().UnixNano() + 2)
 
-func RandString(n int) string {
+var loginMutex sync.Mutex
+var cartMutex sync.Mutex
+var orderMutex sync.Mutex
+
+func RandString(src rand.Source, n int) string {
 	b := make([]byte, n)
-	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
 		if remain == 0 {
 			cache, remain = src.Int63(), letterIdxMax
@@ -51,7 +56,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password: "",
 	DB:       0,
-	PoolSize: 1000,
+	PoolSize: 2000,
 })
 
 type userType struct {
@@ -64,7 +69,10 @@ var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
 var cache_food_last_update_time int
-var mutex = &sync.Mutex{}
+
+var mutex_cache_food_stock sync.Mutex
+var mutex_cache_token_user sync.Mutex
+var mutex_cache_food_last_update_time sync.Mutex
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -100,13 +108,17 @@ func PostLogin(username string, password string) (int, int, string) {
 		return -1, -1, ""
 	}
 
-	token := RandString(8)
-	//fmt.Println("token = " + token)
+	loginMutex.Lock()
+	token := RandString(srcLogin, 8)
+	loginMutex.Unlock()
+
 	s := fmt.Sprintf("token:%s:user", token)
 	r.Set(s, user_id, 0)
-	mutex.Lock()
+
+	mutex_cache_token_user.Lock()
 	cache_token_user[token] = user_id
-	mutex.Unlock()
+	mutex_cache_token_user.Unlock()
+
 	rtn_user_id, err := strconv.Atoi(user_id)
 	if err != nil {
 		return -1, -1, ""
@@ -121,7 +133,9 @@ func get_token_user(token string) string {
 		s := fmt.Sprintf("token:%s:user", token)
 		user_id := r.Get(s).Val()
 		if user_id != "" {
+			mutex_cache_token_user.Lock()
 			cache_token_user[token] = user_id
+			mutex_cache_token_user.Unlock()
 		}
 
 		return user_id
@@ -137,7 +151,10 @@ func Is_token_exist(token string) bool {
 }
 
 func Create_cart(token string) string {
-	cartid := RandString(32)
+	cartMutex.Lock()
+	cartid := RandString(srcCart, 16)
+	cartMutex.Unlock()
+
 	r.Set(fmt.Sprintf("cart:%s:user", cartid), get_token_user(token), 0)
 	return cartid
 }
@@ -171,12 +188,17 @@ func Get_foods() []map[string]interface{} {
 
 	if stock_ != nil {
 		stock_delta := stock_.([]interface{})
+		mutex_cache_food_last_update_time.Lock()
 		cache_food_last_update_time, _ = stock_delta[1].(int)
+		mutex_cache_food_last_update_time.Unlock()
+
 		for i := 2; i < len(stock_delta); i += 2 {
 			id := int(stock_delta[i].(int64))
 			stock := int(stock_delta[i+1].(int64))
 			food_id := strconv.Itoa(id)
+			mutex_cache_food_stock.Lock()
 			cache_food_stock[food_id] = stock
+			mutex_cache_food_stock.Unlock()
 		}
 	}
 
@@ -199,7 +221,10 @@ func Get_foods() []map[string]interface{} {
 }
 
 func PostOrder(cart_id string, token string) (int, string) {
-	order_id := RandString(8)
+	orderMutex.Lock()
+	order_id := RandString(srcOrder, 8)
+	orderMutex.Unlock()
+
 	res, err := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Result()
 	if err != nil {
 		L.Fatal("Failed to post order, err:", err)
