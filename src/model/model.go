@@ -201,9 +201,7 @@ func PostOrder(cart_id string, token string) (int, string) {
 	return rtn, order_id
 }
 
-func GetOrder(token string) (ret map[string]interface{}, found bool) {
-	userid := get_token_user(token)
-	uid, _ := strconv.Atoi(userid)
+func GetOrder(token string) (ret string, found bool) {
 	orderid := r.Get(fmt.Sprintf("user:%s:order", get_token_user(token))).Val()
 	if orderid == "" {
 		found = false
@@ -213,7 +211,7 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 	//cartid := r.HGet("order:cart", orderid).Val()
 	//items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
 	items := r.HGetAll(fmt.Sprintf("order:%s", orderid)).Val()
-	var item_arr []map[string]int
+	var item_str string
 	total := 0
 	for i := 0; i < len(items); i += 2 {
 		food := items[i]
@@ -222,25 +220,35 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 		c, _ := strconv.Atoi(count)
 		price := cache_food_price[food]
 		total += price * c
-		item_arr = append(item_arr, map[string]int{"food_id": f, "count": c})
+		if i>0 {
+			item_str += ","
+		}
+		item_str += `{"food_id": ` +strconv.Itoa(f) +`, "count": ` + strconv.Itoa(c) + `}`
 	}
-	ret = map[string]interface{}{
-		"userid":  uid,
-		"orderid": orderid,
-		"items":   item_arr,
-		"total":   total,
-	}
+	ret = `[{` + 
+		`"id": ` +
+			`"`+ orderid + `"  ,` +
+		`"items": 
+		  [ ` +
+			  item_str +
+		` ],` +
+		`"total":` +
+		   strconv.Itoa(total) +
+	`}]`
 	return
 }
 
-func AdminGetOrder(token string) []map[string]interface{} {
+func AdminGetOrder(token string) string {
 	results := adminQuery.Run(r, []string{}, []string{}).Val().([]interface{})
-	var ret []map[string]interface{}
-
+	ret := "["
+	
 	for i := 0; i < len(results); i += 1 {
+		if i>0 {
+			ret += ","
+		}
 		var result = results[i].([]interface{})
 		var items = result[2].([]interface{})
-		var item_arr []map[string]int
+		var item_str string
 		var total = 0
 
 		for j := 0; j < len(items); j += 2 {
@@ -248,18 +256,26 @@ func AdminGetOrder(token string) []map[string]interface{} {
 			count, _ := strconv.Atoi(items[j+1].(string))
 			price := cache_food_price[items[j].(string)]
 			total += price * count
-			item_arr = append(item_arr, map[string]int{"food_id": food, "count": count})
+			if j>0 {
+				item_str += ","
+			}
+			item_str += `{"food_id": ` +strconv.Itoa(food) +`, "count": ` + strconv.Itoa(count) + `}`
 		}
 
-		user_id_i, _ := strconv.Atoi(result[1].(string))
-		ret = append(ret, map[string]interface{}{
-			"id":      result[0].(string),
-			"user_id": user_id_i,
-			"items":   item_arr,
-			"total":   total,
-		})
+		ret += `{` + 
+			`"id":` +
+			`"` + result[0].(string) +`",` + 
+			`"user_id":` +
+			 result[1].(string) +`,` +
+			`"items":
+			[
+			` +   item_str +
+			`],` +
+			`"total":` + strconv.Itoa(total) +
+		`}`
 	}
-
+	ret += `]`
+	L.Println(ret)
 	return ret
 }
 

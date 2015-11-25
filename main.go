@@ -13,6 +13,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/bitly/go-simplejson"
 	"runtime"
+	"strconv"
 )
 
 func TokenChecker(r *rest.Request) (int, string) {
@@ -53,18 +54,25 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 		rtn, user_id, token := model.PostLogin(username, password)
 
 		if rtn == 0 {
-			w.WriteJson(map[string]interface{}{"user_id": user_id, "username": username, "access_token": token})
+			w.(http.ResponseWriter).Write([]byte(
+			` {"user_id": ` +
+			 strconv.Itoa(user_id) +
+			`, "username": ` +
+			`"` + username + `"` + 
+			`, "access_token": ` +
+			 `"` + token + `"` +
+			`}`))
 		} else {
 			w.WriteHeader(http.StatusForbidden)
-			w.WriteJson(map[string]string{"code": "USER_AUTH_FAIL", "message": "用户名或密码错误"})
+			w.(http.ResponseWriter).Write([]byte(` {"code": "USER_AUTH_FAIL", "message": "用户名或密码错误"}`))
 		}
 	} else if rtn == -1 {
 		// EOF
 		w.WriteHeader(http.StatusBadRequest)
-		w.WriteJson(map[string]string{"code": "EMPTY_REQUEST", "message": "请求体为空"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "EMPTY_REQUEST", "message": "请求体为空"}`))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		w.WriteJson(map[string]string{"code": "MALFORMED_JSON", "message": "格式错误"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "MALFORMED_JSON", "message": "格式错误"}`))
 	}
 }
 
@@ -72,7 +80,7 @@ func Foods(w rest.ResponseWriter, r *rest.Request) {
 	rtn, _ := TokenChecker(r)
 	if rtn < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"}`))
 		return
 	}
 	res := model.Get_foods()
@@ -83,7 +91,7 @@ func Post_carts(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	if rtn < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"}`))
 		return
 	}
 
@@ -112,24 +120,24 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		case -1:
 			w.WriteHeader(http.StatusNotFound)
-			w.WriteJson(map[string]string{"code": "CART_NOT_FOUND", "message": "篮子不存在"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "CART_NOT_FOUND", "message": "篮子不存在"}`))
 		case -2:
 			w.WriteHeader(http.StatusNotFound)
-			w.WriteJson(map[string]string{"code": "FOOD_NOT_FOUND", "message": "食物不存在"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "FOOD_NOT_FOUND", "message": "食物不存在"}`))
 		case -3:
 			w.WriteHeader(http.StatusForbidden)
-			w.WriteJson(map[string]string{"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数量超过了三个"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "FOOD_OUT_OF_LIMIT", "message": "篮子中食物数量超过了三个"}`))
 		default:
 			w.WriteHeader(http.StatusUnauthorized)
-			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"}`))
 		}
 	} else if rtn == -1 {
 		// EOF
 		w.WriteHeader(http.StatusBadRequest)
-		w.WriteJson(map[string]string{"code": "EMPTY_REQUEST", "message": "请求体为空"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "EMPTY_REQUEST", "message": "请求体为空"}`))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		w.WriteJson(map[string]string{"code": "MALFORMED_JSON", "message": "格式错误"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "MALFORMED_JSON", "message": "格式错误"}`))
 	}
 }
 
@@ -137,7 +145,7 @@ func Post_orders(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	if rtn < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"}`))
 		return
 	}
 
@@ -150,28 +158,29 @@ func Post_orders(w rest.ResponseWriter, r *rest.Request) {
 		rtn, order_id := model.PostOrder(cart_id, token)
 
 		if rtn == 0 {
-			w.WriteJson(map[string]string{"id": order_id})
+			w.(http.ResponseWriter).Write([]byte(` {"id": ` +
+			`"` + order_id + `"  }`))
 		} else if rtn == -1 {
 			w.WriteHeader(http.StatusNotFound)
-			w.WriteJson(map[string]string{"code": "CART_NOT_FOUND", "message": "篮子不存在"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "CART_NOT_FOUND", "message": "篮子不存在"}`))
 		} else if rtn == -2 {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.WriteJson(map[string]string{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "NOT_AUTHORIZED_TO_ACCESS_CART", "message": "无权限访问指定的篮子"}`))
 		} else if rtn == -3 {
 			w.WriteHeader(http.StatusForbidden)
-			w.WriteJson(map[string]string{"code": "FOOD_OUT_OF_STOCK", "message": "食物库存不足"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "FOOD_OUT_OF_STOCK", "message": "食物库存不足"}`))
 		} else {
 			// rtn == -4
 			w.WriteHeader(http.StatusForbidden)
-			w.WriteJson(map[string]string{"code": "ORDER_OUT_OF_LIMIT", "message": "每个用户只能下一单"})
+			w.(http.ResponseWriter).Write([]byte(`{"code": "ORDER_OUT_OF_LIMIT", "message": "每个用户只能下一单"}`))
 		}
 	} else if rtn == -1 {
 		// EOF
 		w.WriteHeader(http.StatusBadRequest)
-		w.WriteJson(map[string]string{"code": "EMPTY_REQUEST", "message": "请求体为空"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "EMPTY_REQUEST", "message": "请求体为空"}`))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		w.WriteJson(map[string]string{"code": "MALFORMED_JSON", "message": "格式错误"})
+		w.(http.ResponseWriter).Write([]byte(`{"code": "MALFORMED_JSON", "message": "格式错误"}`))
 	}
 }
 
@@ -180,7 +189,7 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	if rtn < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		w.(http.ResponseWriter).Write([]byte(`code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"}`))
 		return
 	}
 
@@ -190,14 +199,8 @@ func get_orders(w rest.ResponseWriter, r *rest.Request) {
 		w.WriteJson([]interface{}{})
 		return
 	}
-	var ret []map[string]interface{}
-	ret = append(ret, map[string]interface{}{
-		"id":    res["orderid"],
-		"items": res["items"],
-		"total": res["total"],
-	})
-	//model.L.Print(ret)
-	w.WriteJson(ret)
+
+	w.(http.ResponseWriter).Write([]byte(res))
 }
 
 func get_admin_orders(w rest.ResponseWriter, r *rest.Request) {
@@ -205,12 +208,12 @@ func get_admin_orders(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	if rtn < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.WriteJson(map[string]string{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"})
+		w.(http.ResponseWriter).Write([]byte(`"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"}`))
 		return
 	}
 
 	res := model.AdminGetOrder(token)
-	w.WriteJson(res)
+	w.(http.ResponseWriter).Write([]byte(res))
 }
 
 /* Util function */
