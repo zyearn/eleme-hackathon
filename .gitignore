@@ -7,3 +7,4 @@
 *.prof
 *.lprof
 .DS_Store
+src/github.com/garyburd/
