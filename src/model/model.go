@@ -51,7 +51,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password: "",
 	DB:       0,
-	PoolSize: 500,
+	PoolSize: 1000,
 })
 
 type userType struct {
@@ -164,17 +164,20 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 
 func Get_foods() []map[string]interface{} {
 	var ret []map[string]interface{}
-	stock_delta := queryStock.Run(
+	stock_ := queryStock.Run(
 		r,
 		[]string{strconv.Itoa(cache_food_last_update_time)},
-		[]string{}).Val().([]interface{})
+		[]string{}).Val()
 
-	cache_food_last_update_time, _ = stock_delta[1].(int)
-	for i := 2; i < len(stock_delta); i += 2 {
-		id := int(stock_delta[i].(int64))
-		stock := int(stock_delta[i+1].(int64))
-		food_id := strconv.Itoa(id)
-		cache_food_stock[food_id] = stock
+	if stock_ != nil {
+		stock_delta := stock_.([]interface{})
+		cache_food_last_update_time, _ = stock_delta[1].(int)
+		for i := 2; i < len(stock_delta); i += 2 {
+			id := int(stock_delta[i].(int64))
+			stock := int(stock_delta[i+1].(int64))
+			food_id := strconv.Itoa(id)
+			cache_food_stock[food_id] = stock
+		}
 	}
 
 	keys := []string{}
