@@ -211,6 +211,7 @@ func GetOrder(token string) (ret string, found bool) {
 	//cartid := r.HGet("order:cart", orderid).Val()
 	//items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
 	items := r.HGetAll(fmt.Sprintf("order:%s", orderid)).Val()
+
 	var item_str string
 	total := 0
 	for i := 0; i < len(items); i += 2 {
@@ -256,6 +257,7 @@ func AdminGetOrder(token string) string {
 			count, _ := strconv.Atoi(items[j+1].(string))
 			price := cache_food_price[items[j].(string)]
 			total += price * count
+
 			if j>0 {
 				item_str += ","
 			}
@@ -275,7 +277,7 @@ func AdminGetOrder(token string) string {
 		`}`
 	}
 	ret += `]`
-	L.Println(ret)
+
 	return ret
 }
 
