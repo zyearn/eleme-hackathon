@@ -12,6 +12,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -23,11 +24,16 @@ const (
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
 
-var src = rand.NewSource(time.Now().UnixNano())
+var srcLogin = rand.NewSource(time.Now().UnixNano())
+var srcCart = rand.NewSource(time.Now().UnixNano() + 1)
+var srcOrder = rand.NewSource(time.Now().UnixNano() + 2)
 
-func RandString(n int) string {
+var loginMutex sync.Mutex
+var cartMutex sync.Mutex
+var orderMutex sync.Mutex
+
+func RandString(src rand.Source, n int) string {
 	b := make([]byte, n)
-	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
 		if remain == 0 {
 			cache, remain = src.Int63(), letterIdxMax
@@ -50,7 +56,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password: "",
 	DB:       0,
-	PoolSize: 500,
+	PoolSize: 2000,
 })
 
 type userType struct {
@@ -63,6 +69,10 @@ var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
 var cache_food_last_update_time int
+
+var mutex_cache_food_stock sync.Mutex
+var mutex_cache_token_user sync.Mutex
+var mutex_cache_food_last_update_time sync.Mutex
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -98,11 +108,17 @@ func PostLogin(username string, password string) (int, int, string) {
 		return -1, -1, ""
 	}
 
-	token := RandString(8)
-	//fmt.Println("token = " + token)
+	loginMutex.Lock()
+	token := RandString(srcLogin, 8)
+	loginMutex.Unlock()
+
 	s := fmt.Sprintf("token:%s:user", token)
 	r.Set(s, user_id, 0)
+
+	mutex_cache_token_user.Lock()
 	cache_token_user[token] = user_id
+	mutex_cache_token_user.Unlock()
+
 	rtn_user_id, err := strconv.Atoi(user_id)
 	if err != nil {
 		return -1, -1, ""
@@ -117,7 +133,9 @@ func get_token_user(token string) string {
 		s := fmt.Sprintf("token:%s:user", token)
 		user_id := r.Get(s).Val()
 		if user_id != "" {
+			mutex_cache_token_user.Lock()
 			cache_token_user[token] = user_id
+			mutex_cache_token_user.Unlock()
 		}
 
 		return user_id
@@ -133,7 +151,10 @@ func Is_token_exist(token string) bool {
 }
 
 func Create_cart(token string) string {
-	cartid := RandString(32)
+	cartMutex.Lock()
+	cartid := RandString(srcCart, 16)
+	cartMutex.Unlock()
+
 	r.Set(fmt.Sprintf("cart:%s:user", cartid), get_token_user(token), 0)
 	return cartid
 }
@@ -160,17 +181,25 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 
 func Get_foods() []map[string]interface{} {
 	var ret []map[string]interface{}
-	stock_delta := queryStock.Run(
+	stock_ := queryStock.Run(
 		r,
 		[]string{strconv.Itoa(cache_food_last_update_time)},
-		[]string{}).Val().([]interface{})
+		[]string{}).Val()
 
-	cache_food_last_update_time, _ = stock_delta[1].(int)
-	for i := 2; i < len(stock_delta); i += 2 {
-		id := int(stock_delta[i].(int64))
-		stock := int(stock_delta[i+1].(int64))
-		food_id := strconv.Itoa(id)
-		cache_food_stock[food_id] = stock
+	if stock_ != nil {
+		stock_delta := stock_.([]interface{})
+		mutex_cache_food_last_update_time.Lock()
+		cache_food_last_update_time, _ = stock_delta[1].(int)
+		mutex_cache_food_last_update_time.Unlock()
+
+		for i := 2; i < len(stock_delta); i += 2 {
+			id := int(stock_delta[i].(int64))
+			stock := int(stock_delta[i+1].(int64))
+			food_id := strconv.Itoa(id)
+			mutex_cache_food_stock.Lock()
+			cache_food_stock[food_id] = stock
+			mutex_cache_food_stock.Unlock()
+		}
 	}
 
 	keys := []string{}
@@ -192,7 +221,10 @@ func Get_foods() []map[string]interface{} {
 }
 
 func PostOrder(cart_id string, token string) (int, string) {
-	order_id := RandString(8)
+	orderMutex.Lock()
+	order_id := RandString(srcOrder, 8)
+	orderMutex.Unlock()
+
 	res, err := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Result()
 	if err != nil {
 		L.Fatal("Failed to post order, err:", err)
@@ -201,9 +233,7 @@ func PostOrder(cart_id string, token string) (int, string) {
 	return rtn, order_id
 }
 
-func GetOrder(token string) (ret map[string]interface{}, found bool) {
-	userid := get_token_user(token)
-	uid, _ := strconv.Atoi(userid)
+func GetOrder(token string) (ret string, found bool) {
 	orderid := r.Get(fmt.Sprintf("user:%s:order", get_token_user(token))).Val()
 	if orderid == "" {
 		found = false
@@ -213,7 +243,8 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 	//cartid := r.HGet("order:cart", orderid).Val()
 	//items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
 	items := r.HGetAll(fmt.Sprintf("order:%s", orderid)).Val()
-	var item_arr []map[string]int
+
+	var item_str string
 	total := 0
 	for i := 0; i < len(items); i += 2 {
 		food := items[i]
@@ -222,25 +253,35 @@ func GetOrder(token string) (ret map[string]interface{}, found bool) {
 		c, _ := strconv.Atoi(count)
 		price := cache_food_price[food]
 		total += price * c
-		item_arr = append(item_arr, map[string]int{"food_id": f, "count": c})
+		if i > 0 {
+			item_str += ","
+		}
+		item_str += `{"food_id": ` + strconv.Itoa(f) + `, "count": ` + strconv.Itoa(c) + `}`
 	}
-	ret = map[string]interface{}{
-		"userid":  uid,
-		"orderid": orderid,
-		"items":   item_arr,
-		"total":   total,
-	}
+	ret = `[{` +
+		`"id": ` +
+		`"` + orderid + `"  ,` +
+		`"items": 
+		  [ ` +
+		item_str +
+		` ],` +
+		`"total":` +
+		strconv.Itoa(total) +
+		`}]`
 	return
 }
 
-func AdminGetOrder(token string) []map[string]interface{} {
+func AdminGetOrder(token string) string {
 	results := adminQuery.Run(r, []string{}, []string{}).Val().([]interface{})
-	var ret []map[string]interface{}
+	ret := "["
 
 	for i := 0; i < len(results); i += 1 {
+		if i > 0 {
+			ret += ","
+		}
 		var result = results[i].([]interface{})
 		var items = result[2].([]interface{})
-		var item_arr []map[string]int
+		var item_str string
 		var total = 0
 
 		for j := 0; j < len(items); j += 2 {
@@ -248,17 +289,26 @@ func AdminGetOrder(token string) []map[string]interface{} {
 			count, _ := strconv.Atoi(items[j+1].(string))
 			price := cache_food_price[items[j].(string)]
 			total += price * count
-			item_arr = append(item_arr, map[string]int{"food_id": food, "count": count})
+
+			if j > 0 {
+				item_str += ","
+			}
+			item_str += `{"food_id": ` + strconv.Itoa(food) + `, "count": ` + strconv.Itoa(count) + `}`
 		}
 
-		user_id_i, _ := strconv.Atoi(result[1].(string))
-		ret = append(ret, map[string]interface{}{
-			"id":      result[0].(string),
-			"user_id": user_id_i,
-			"items":   item_arr,
-			"total":   total,
-		})
+		ret += `{` +
+			`"id":` +
+			`"` + result[0].(string) + `",` +
+			`"user_id":` +
+			result[1].(string) + `,` +
+			`"items":
+			[
+			` + item_str +
+			`],` +
+			`"total":` + strconv.Itoa(total) +
+			`}`
 	}
+	ret += `]`
 
 	return ret
 }
