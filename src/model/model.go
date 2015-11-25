@@ -70,9 +70,9 @@ var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
 var cache_food_last_update_time int
 
-var mutex_cache_food_stock sync.Mutex
-var mutex_cache_token_user sync.Mutex
-var mutex_cache_food_last_update_time sync.Mutex
+var mutex_cache_food_stock sync.RWMutex
+var mutex_cache_token_user sync.RWMutex
+var mutex_cache_food_last_update_time sync.RWMutex
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -127,7 +127,11 @@ func PostLogin(username string, password string) (int, int, string) {
 }
 
 func get_token_user(token string) string {
-	if id, ok := cache_token_user[token]; ok {
+	mutex_cache_token_user.RLock()
+	id, ok := cache_token_user[token]
+	mutex_cache_token_user.RUnlock()
+
+	if ok {
 		return id
 	} else {
 		s := fmt.Sprintf("token:%s:user", token)
@@ -180,10 +184,13 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 }
 
 func Get_foods() []map[string]interface{} {
-	var ret []map[string]interface{}
+	mutex_cache_food_last_update_time.RLock()
+	_time := cache_food_last_update_time
+	mutex_cache_food_last_update_time.RUnlock()
+
 	stock_ := queryStock.Run(
 		r,
-		[]string{strconv.Itoa(cache_food_last_update_time)},
+		[]string{strconv.Itoa(_time)},
 		[]string{}).Val()
 
 	if stock_ != nil {
@@ -208,13 +215,18 @@ func Get_foods() []map[string]interface{} {
 	}
 
 	sort.Strings(keys)
+	var ret []map[string]interface{}
 	for _, v := range keys {
 		k := v
+		mutex_cache_food_stock.RLock()
+		_stock := cache_food_stock[k]
+		mutex_cache_food_stock.RUnlock()
+
 		food_id, _ := strconv.Atoi(k)
 		ret = append(ret, map[string]interface{}{
 			"id":    food_id,
 			"price": cache_food_price[k],
-			"stock": cache_food_stock[k],
+			"stock": _stock,
 		})
 	}
 	return ret
