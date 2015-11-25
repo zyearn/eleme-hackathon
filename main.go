@@ -6,12 +6,12 @@ import (
 	"./src/model"
 	"encoding/json"
 	"fmt"
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/bitly/go-simplejson"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/bitly/go-simplejson"
 	"runtime"
 	"strconv"
 )
@@ -55,13 +55,13 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 
 		if rtn == 0 {
 			w.(http.ResponseWriter).Write([]byte(
-			` {"user_id": ` +
-			 strconv.Itoa(user_id) +
-			`, "username": ` +
-			`"` + username + `"` + 
-			`, "access_token": ` +
-			 `"` + token + `"` +
-			`}`))
+				` {"user_id": ` +
+					strconv.Itoa(user_id) +
+					`, "username": ` +
+					`"` + username + `"` +
+					`, "access_token": ` +
+					`"` + token + `"` +
+					`}`))
 		} else {
 			w.WriteHeader(http.StatusForbidden)
 			w.(http.ResponseWriter).Write([]byte(` {"code": "USER_AUTH_FAIL", "message": "用户名或密码错误"}`))
@@ -159,7 +159,7 @@ func Post_orders(w rest.ResponseWriter, r *rest.Request) {
 
 		if rtn == 0 {
 			w.(http.ResponseWriter).Write([]byte(` {"id": ` +
-			`"` + order_id + `"  }`))
+				`"` + order_id + `"  }`))
 		} else if rtn == -1 {
 			w.WriteHeader(http.StatusNotFound)
 			w.(http.ResponseWriter).Write([]byte(`{"code": "CART_NOT_FOUND", "message": "篮子不存在"}`))
@@ -231,7 +231,7 @@ func parse_request_body(r *rest.Request, data *interface{}) int {
 
 /* Util function */
 func main() {
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	model.Sync_redis_from_mysql()
 	fmt.Println("server started")
 
