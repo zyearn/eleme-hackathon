@@ -12,6 +12,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -63,6 +64,7 @@ var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
 var cache_food_last_update_time int
+var mutex = &sync.Mutex{}
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -102,7 +104,9 @@ func PostLogin(username string, password string) (int, int, string) {
 	//fmt.Println("token = " + token)
 	s := fmt.Sprintf("token:%s:user", token)
 	r.Set(s, user_id, 0)
+	mutex.Lock()
 	cache_token_user[token] = user_id
+	mutex.Unlock()
 	rtn_user_id, err := strconv.Atoi(user_id)
 	if err != nil {
 		return -1, -1, ""
@@ -221,30 +225,30 @@ func GetOrder(token string) (ret string, found bool) {
 		c, _ := strconv.Atoi(count)
 		price := cache_food_price[food]
 		total += price * c
-		if i>0 {
+		if i > 0 {
 			item_str += ","
 		}
-		item_str += `{"food_id": ` +strconv.Itoa(f) +`, "count": ` + strconv.Itoa(c) + `}`
+		item_str += `{"food_id": ` + strconv.Itoa(f) + `, "count": ` + strconv.Itoa(c) + `}`
 	}
-	ret = `[{` + 
+	ret = `[{` +
 		`"id": ` +
-			`"`+ orderid + `"  ,` +
+		`"` + orderid + `"  ,` +
 		`"items": 
 		  [ ` +
-			  item_str +
+		item_str +
 		` ],` +
 		`"total":` +
-		   strconv.Itoa(total) +
-	`}]`
+		strconv.Itoa(total) +
+		`}]`
 	return
 }
 
 func AdminGetOrder(token string) string {
 	results := adminQuery.Run(r, []string{}, []string{}).Val().([]interface{})
 	ret := "["
-	
+
 	for i := 0; i < len(results); i += 1 {
-		if i>0 {
+		if i > 0 {
 			ret += ","
 		}
 		var result = results[i].([]interface{})
@@ -258,23 +262,23 @@ func AdminGetOrder(token string) string {
 			price := cache_food_price[items[j].(string)]
 			total += price * count
 
-			if j>0 {
+			if j > 0 {
 				item_str += ","
 			}
-			item_str += `{"food_id": ` +strconv.Itoa(food) +`, "count": ` + strconv.Itoa(count) + `}`
+			item_str += `{"food_id": ` + strconv.Itoa(food) + `, "count": ` + strconv.Itoa(count) + `}`
 		}
 
-		ret += `{` + 
+		ret += `{` +
 			`"id":` +
-			`"` + result[0].(string) +`",` + 
+			`"` + result[0].(string) + `",` +
 			`"user_id":` +
-			 result[1].(string) +`,` +
+			result[1].(string) + `,` +
 			`"items":
 			[
-			` +   item_str +
+			` + item_str +
 			`],` +
 			`"total":` + strconv.Itoa(total) +
-		`}`
+			`}`
 	}
 	ret += `]`
 
