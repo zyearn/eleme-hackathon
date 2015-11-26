@@ -53,10 +53,16 @@ func RandString(src rand.Source, n int) string {
 
 var L = log.New(os.Stderr, "", 0)
 var r = redis.NewClient(&redis.Options{
-	Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
-	Password: "",
-	DB:       0,
-	PoolSize: 2000,
+	Addr:         os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
+	Password:     "",
+	DB:           0,
+	PoolSize:     300,
+	MaxRetries:   3,
+	DialTimeout:  3 * time.Second,
+	ReadTimeout:  3 * time.Second,
+	WriteTimeout: 3 * time.Second,
+	PoolTimeout:  3 * time.Second,
+	IdleTimeout:  100 * time.Second,
 })
 
 type userType struct {
