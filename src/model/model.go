@@ -194,21 +194,25 @@ func Get_foods() []map[string]interface{} {
 	_time := cache_food_last_update_time
 	mutex_cache_food_last_update_time.RUnlock()
 
-	stock_ := queryStock.Run(
-		r,
-		[]string{strconv.Itoa(_time)},
-		[]string{}).Val()
-
-	if stock_ != nil {
-		stock_delta := stock_.([]interface{})
+	time_latest := atoi(r.Get(constant.TIMESTAMP).Val())
+	if time_latest != _time {
 		mutex_cache_food_last_update_time.Lock()
-		cache_food_last_update_time, _ = stock_delta[1].(int)
+		cache_food_last_update_time = time_latest
 		mutex_cache_food_last_update_time.Unlock()
 
-		for i := 2; i < len(stock_delta); i += 2 {
-			id := int(stock_delta[i].(int64))
-			stock := int(stock_delta[i+1].(int64))
+		results := r.ZRangeByScore("food:id:stock", redis.ZRangeByScore{strconv.Itoa(_time), "+inf", 0, 0}).Val()
+
+		fmt.Println("len of results=", len(results))
+		for i := 0; i < len(results); i += 1 {
+			raw_number, err := strconv.ParseInt(results[i], 10, 64)
+			if err != nil {
+				L.Fatal("err strconv.ParseInt")
+			}
+
+			id := int(raw_number / 10000 % 100000)
+			stock := int(raw_number % 10000)
 			food_id := strconv.Itoa(id)
+
 			mutex_cache_food_stock.Lock()
 			cache_food_stock[food_id] = stock
 			mutex_cache_food_stock.Unlock()
