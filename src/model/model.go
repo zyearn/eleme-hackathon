@@ -56,7 +56,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:         os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password:     "",
 	DB:           0,
-	PoolSize:     300,
+	PoolSize:     350,
 	MaxRetries:   3,
 	DialTimeout:  3 * time.Second,
 	ReadTimeout:  3 * time.Second,
@@ -77,10 +77,10 @@ var cache_token_user = make(map[string]string)
 var cache_cart_user = make(map[string]string)
 var cache_food_last_update_time int
 
-var mutex_cache_food_stock sync.RWMutex
-var mutex_cache_token_user sync.RWMutex
-var mutex_cache_cart_user sync.RWMutex
-var mutex_cache_food_last_update_time sync.RWMutex
+var mutex_cache_food_stock sync.Mutex
+var mutex_cache_token_user sync.Mutex
+var mutex_cache_cart_user sync.Mutex
+var mutex_cache_food_last_update_time sync.Mutex
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -135,9 +135,9 @@ func PostLogin(username string, password string) (int, int, string) {
 }
 
 func get_token_user(token string) string {
-	mutex_cache_token_user.RLock()
+	mutex_cache_token_user.Lock()
 	id, ok := cache_token_user[token]
-	mutex_cache_token_user.RUnlock()
+	mutex_cache_token_user.Unlock()
 
 	if ok {
 		return id
@@ -163,9 +163,9 @@ func Is_token_exist(token string) bool {
 }
 
 func get_cart_user(cartid string) string {
-	mutex_cache_cart_user.RLock()
+	mutex_cache_cart_user.Lock()
 	id, ok := cache_token_user[cartid]
-	mutex_cache_cart_user.RUnlock()
+	mutex_cache_cart_user.Unlock()
 
 	if ok {
 		return id
@@ -189,9 +189,9 @@ func Create_cart(token string) string {
 
 	uid := get_token_user(token)
 	r.Set(fmt.Sprintf("cart:%s:user", cartid), uid, 0)
-	mutex_cache_cart_user.RLock()
+	mutex_cache_cart_user.Lock()
 	cache_cart_user[cartid] = uid
-	mutex_cache_cart_user.RUnlock()
+	mutex_cache_cart_user.Unlock()
 
 	return cartid
 }
@@ -230,23 +230,32 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 }
 
 func Get_foods() []map[string]interface{} {
-	mutex_cache_food_last_update_time.RLock()
+	mutex_cache_food_last_update_time.Lock()
 	_time := cache_food_last_update_time
-	mutex_cache_food_last_update_time.RUnlock()
+	mutex_cache_food_last_update_time.Unlock()
 
-	time_latest := atoi(r.Get(constant.TIMESTAMP).Val())
-	if time_latest != _time {
+	var ret []map[string]interface{}
+	time_latest, e := strconv.Atoi(r.Get(constant.TIMESTAMP).Val())
+	if e != nil {
+		L.Fatal("err!strconv.Atoi(r.Get(constant.TIMESTAMP).Val, ", time_latest)
+		return ret
+	}
+
+	if time_latest != _time && time_latest >= 99 {
 		mutex_cache_food_last_update_time.Lock()
 		cache_food_last_update_time = time_latest
 		mutex_cache_food_last_update_time.Unlock()
 
 		results := r.ZRangeByScore("food:id:stock", redis.ZRangeByScore{strconv.Itoa(_time), "+inf", 0, 0}).Val()
 
-		fmt.Println("len of results=", len(results))
 		for i := 0; i < len(results); i += 1 {
+			if results[i] == "" {
+				continue
+			}
 			raw_number, err := strconv.ParseInt(results[i], 10, 64)
 			if err != nil {
 				L.Fatal("err strconv.ParseInt")
+				continue
 			}
 
 			id := int(raw_number / 10000 % 100000)
@@ -265,12 +274,11 @@ func Get_foods() []map[string]interface{} {
 	}
 
 	sort.Strings(keys)
-	var ret []map[string]interface{}
 	for _, v := range keys {
 		k := v
-		mutex_cache_food_stock.RLock()
+		mutex_cache_food_stock.Lock()
 		_stock := cache_food_stock[k]
-		mutex_cache_food_stock.RUnlock()
+		mutex_cache_food_stock.Unlock()
 
 		food_id, _ := strconv.Atoi(k)
 		ret = append(ret, map[string]interface{}{
@@ -439,6 +447,8 @@ func init_cache_and_redis(init_redis bool) {
 		p.Set(constant.INIT_TIME, -10000, 0)
 		p.Exec()
 	}
+
+	cache_food_last_update_time = now
 }
 
 func Sync_redis_from_mysql() {
