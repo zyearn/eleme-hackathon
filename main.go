@@ -111,8 +111,6 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 		user_info, _ := simplejson.NewJson(byte_json)
 		foodid, _ := user_info.Get("food_id").Int()
 		count, _ := user_info.Get("count").Int()
-		//model.L.Print(user_info)
-		//model.L.Print("foodid is ", foodid, " count is ", count)
 
 		rtn = model.Cart_add_food(token, cartid, foodid, count)
 		switch rtn {

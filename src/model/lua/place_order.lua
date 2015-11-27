@@ -32,8 +32,13 @@ for i = 1, #cart_items, 2 do
     local time_last_update = redis.call('hget', 'food:last_update_time', id)
     local records = redis.call('zrangebyscore', 'food:id:stock', tonumber(time_last_update), tonumber(time_last_update))
     
-    local stock = tonumber(records[1]) % 10000
-    assert(stock)
+    local stock
+    if records[1] == nil then
+        stock = 100
+    else
+        stock = tonumber(records[1]) % 10000
+    end
+
     local remain = stock - count
     if remain < 0 then
             return -3
