@@ -238,33 +238,33 @@ func Get_foods() []map[string]interface{} {
 	time_latest, e := strconv.Atoi(r.Get(constant.TIMESTAMP).Val())
 	if e != nil {
 		L.Fatal("err!strconv.Atoi(r.Get(constant.TIMESTAMP).Val, ", time_latest)
-		return ret
-	}
+	} else {
 
-	if time_latest != _time && time_latest >= 99 {
-		mutex_cache_food_last_update_time.Lock()
-		cache_food_last_update_time = time_latest
-		mutex_cache_food_last_update_time.Unlock()
+		if time_latest != _time && time_latest >= 99 {
+			mutex_cache_food_last_update_time.Lock()
+			cache_food_last_update_time = time_latest
+			mutex_cache_food_last_update_time.Unlock()
 
-		results := r.ZRangeByScore("food:id:stock", redis.ZRangeByScore{strconv.Itoa(_time), "+inf", 0, 0}).Val()
+			results := r.ZRangeByScore("food:id:stock", redis.ZRangeByScore{strconv.Itoa(_time), "+inf", 0, 0}).Val()
 
-		for i := 0; i < len(results); i += 1 {
-			if results[i] == "" {
-				continue
+			for i := 0; i < len(results); i += 1 {
+				if results[i] == "" {
+					continue
+				}
+				raw_number, err := strconv.ParseInt(results[i], 10, 64)
+				if err != nil {
+					L.Fatal("err strconv.ParseInt")
+					continue
+				}
+
+				id := int(raw_number / 10000 % 100000)
+				stock := int(raw_number % 10000)
+				food_id := strconv.Itoa(id)
+
+				mutex_cache_food_stock.Lock()
+				cache_food_stock[food_id] = stock
+				mutex_cache_food_stock.Unlock()
 			}
-			raw_number, err := strconv.ParseInt(results[i], 10, 64)
-			if err != nil {
-				L.Fatal("err strconv.ParseInt")
-				continue
-			}
-
-			id := int(raw_number / 10000 % 100000)
-			stock := int(raw_number % 10000)
-			food_id := strconv.Itoa(id)
-
-			mutex_cache_food_stock.Lock()
-			cache_food_stock[food_id] = stock
-			mutex_cache_food_stock.Unlock()
 		}
 	}
 
