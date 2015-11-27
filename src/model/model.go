@@ -74,10 +74,12 @@ var cache_userid = make(map[string]string) //name -> id
 var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
+var cache_cart_user = make(map[string]string)
 var cache_food_last_update_time int
 
 var mutex_cache_food_stock sync.RWMutex
 var mutex_cache_token_user sync.RWMutex
+var mutex_cache_cart_user sync.RWMutex
 var mutex_cache_food_last_update_time sync.RWMutex
 
 func atoi(str string) int {
@@ -160,33 +162,71 @@ func Is_token_exist(token string) bool {
 	}
 }
 
+func get_cart_user(cartid string) string {
+	mutex_cache_cart_user.RLock()
+	id, ok := cache_token_user[cartid]
+	mutex_cache_cart_user.RUnlock()
+
+	if ok {
+		return id
+	} else {
+		s := fmt.Sprintf("cart:%s:user", cartid)
+		user_id := r.Get(s).Val()
+		if cartid != "" {
+			mutex_cache_cart_user.Lock()
+			cache_cart_user[cartid] = user_id
+			mutex_cache_cart_user.Unlock()
+		}
+
+		return user_id
+	}
+}
+
 func Create_cart(token string) string {
 	cartMutex.Lock()
 	cartid := RandString(srcCart, 16)
 	cartMutex.Unlock()
 
-	r.Set(fmt.Sprintf("cart:%s:user", cartid), get_token_user(token), 0)
+	uid := get_token_user(token)
+	r.Set(fmt.Sprintf("cart:%s:user", cartid), uid, 0)
+	mutex_cache_cart_user.RLock()
+	cache_cart_user[cartid] = uid
+	mutex_cache_cart_user.RUnlock()
+
 	return cartid
 }
 
 func Cart_add_food(token, cartid string, foodid int, count int) int {
 	foodid_s := strconv.Itoa(foodid)
-	count_s := strconv.Itoa(count)
 	_, exist := cache_food_price[foodid_s]
+
 	if !exist {
-		//L.Print(foodid, " has ", num)
 		return -2
 	}
-	res, err := addFood.Run(
-		r,
-		[]string{token, cartid, foodid_s, count_s},
-		[]string{}).Result()
 
-	if err != nil {
-		L.Fatal(err)
+	cart_user := get_cart_user(cartid)
+	if cart_user == "" {
+		return -1
 	}
 
-	return int(res.(int64))
+	belong_user := get_token_user(token)
+	if belong_user != cart_user {
+		return -4
+	}
+
+	cart_items := r.HGetAll("cart:" + cartid).Val()
+	sum := 0
+	for i := 0; i < len(cart_items); i += 2 {
+		sum += atoi(cart_items[i+1])
+	}
+
+	if sum+count > 3 {
+		return -3
+	}
+
+	r.HIncrBy("cart:"+cartid, foodid_s, int64(count))
+
+	return 0
 }
 
 func Get_foods() []map[string]interface{} {
