@@ -366,7 +366,6 @@ func init_cache_and_redis(init_redis bool) {
 		L.Fatal(dberr)
 	}
 
-	now := 0
 	rows, _ := db.Query("SELECT id,name,password from user")
 	for rows.Next() {
 		var id, name, pwd string
