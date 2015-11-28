@@ -56,7 +56,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:         os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password:     "",
 	DB:           0,
-	PoolSize:     1000,
+	PoolSize:     500,
 	MaxRetries:   3,
 	DialTimeout:  3 * time.Second,
 	ReadTimeout:  3 * time.Second,
@@ -101,9 +101,6 @@ func Load_script_from_file(filename string) *redis.Script {
 }
 
 func PostLogin(username string, password string) (int, int, string) {
-	//fmt.Println("username=" + username)
-	//fmt.Println("password=" + password)
-
 	user_id, ok := cache_userid[username]
 	if !ok {
 		return -1, -1, ""
@@ -398,6 +395,23 @@ func init_cache_and_redis(init_redis bool) {
 		p.Exec()
 	}
 
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+
+			food_stocks := r.HGetAll("food:stock").Val()
+			for i := 0; i < len(food_stocks); i += 2 {
+				s, err := strconv.Atoi(food_stocks[i+1])
+				if err != nil {
+					continue
+				}
+
+				mutex_cache_food_stock.Lock()
+				cache_food_stock[food_stocks[i]] = s
+				mutex_cache_food_stock.Unlock()
+			}
+		}
+	}()
 }
 
 func Sync_redis_from_mysql() {
