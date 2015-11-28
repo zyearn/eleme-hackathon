@@ -397,7 +397,7 @@ func init_cache_and_redis(init_redis bool) {
 
 	go func() {
 		for {
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 
 			food_stocks := r.HGetAll("food:stock").Val()
 			for i := 0; i < len(food_stocks); i += 2 {
