@@ -80,6 +80,8 @@ var mutex_cache_food_stock sync.Mutex
 var mutex_cache_token_user sync.Mutex
 var mutex_cache_cart_user sync.Mutex
 
+var ret_get_foods []map[string]interface{}
+
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
 	if err != nil {
@@ -225,28 +227,8 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 }
 
 func Get_foods() []map[string]interface{} {
-	var ret []map[string]interface{}
 
-	keys := []string{}
-	for k, _ := range cache_food_price {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-	for _, v := range keys {
-		k := v
-		mutex_cache_food_stock.Lock()
-		_stock := cache_food_stock[k]
-		mutex_cache_food_stock.Unlock()
-
-		food_id, _ := strconv.Atoi(k)
-		ret = append(ret, map[string]interface{}{
-			"id":    food_id,
-			"price": cache_food_price[k],
-			"stock": _stock,
-		})
-	}
-	return ret
+	return ret_get_foods
 }
 
 func PostOrder(cart_id string, token string) (int, string) {
@@ -397,6 +379,27 @@ func init_cache_and_redis(init_redis bool) {
 
 	go func() {
 		for {
+			ret_get_foods = make([]map[string]interface{}, 0)
+			keys := []string{}
+			for k, _ := range cache_food_price {
+				keys = append(keys, k)
+			}
+
+			sort.Strings(keys)
+			for _, v := range keys {
+				k := v
+				mutex_cache_food_stock.Lock()
+				_stock := cache_food_stock[k]
+				mutex_cache_food_stock.Unlock()
+
+				food_id, _ := strconv.Atoi(k)
+				ret_get_foods = append(ret_get_foods, map[string]interface{}{
+					"id":    food_id,
+					"price": cache_food_price[k],
+					"stock": _stock,
+				})
+			}
+
 			time.Sleep(10 * time.Second)
 
 			food_stocks := r.HGetAll("food:stock").Val()
