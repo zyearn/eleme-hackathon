@@ -7,12 +7,12 @@
 -- return -2: NOT_AUTHORIZED_TO_ACCESS_CART
 -- return -3: FOOD_OUT_OF_STOCK
 -- return -4: ORDER_OUT_OF_LIMIT
-local user_id = redis.call('get', 'token:'..KEYS[3]..':user')
 local belong_user = redis.call('get', 'cart:'..KEYS[1]..':user')
 if not belong_user then
     return -1
 end
 
+local user_id = redis.call('get', 'token:'..KEYS[3]..':user')
 if user_id ~= belong_user then
     return -2
 end
@@ -29,16 +29,7 @@ for i = 1, #cart_items, 2 do
     local id = tonumber(cart_items[i])
     local count = tonumber(cart_items[i+1])
 
-    local time_last_update = redis.call('hget', 'food:last_update_time', id)
-    local records = redis.call('zrangebyscore', 'food:id:stock', tonumber(time_last_update), tonumber(time_last_update))
-    
-    local stock
-    if records[1] == nil then
-        stock = 100
-    else
-        stock = tonumber(records[1]) % 10000
-    end
-
+    local stock = redis.call('hget', 'food:stock', id)
     local remain = stock - count
     if remain < 0 then
             return -3
@@ -46,22 +37,15 @@ for i = 1, #cart_items, 2 do
 
     tb[n] = id
     tb[n+1] = remain
-    tb[n+2] = time_last_update
-    tb[n+3] = count
-    n = n + 4
+    tb[n+2] = count
+    n = n + 3
 end
 
 local order_id = KEYS[2]
 
-for i = 1, #tb, 4 do
-    local id = tb[i]
-    local remain = tb[i+1]
-    local time_last_update = tonumber(tb[i+2])
-    local timestamp = tonumber(redis.call('incr', 'timestamp'))
-    redis.call('zremrangebyscore', 'food:id:stock', time_last_update, time_last_update)
-    redis.call('zadd', 'food:id:stock', timestamp, timestamp * 1000000000 + id * 10000 + remain)
-    redis.call('hset', 'food:last_update_time', id, timestamp)
-    redis.call('hset', 'order:'..order_id, id, tb[i+3])
+for i = 1, #tb, 3 do
+    redis.call('hset', 'food:stock', tb[i], tb[i+1])
+    redis.call('hset', 'order:'..order_id, tb[i], tb[i+2])
 end
 
 redis.call('set', 'user:'..user_id..':order', order_id)

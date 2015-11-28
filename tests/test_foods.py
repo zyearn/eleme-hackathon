@@ -11,10 +11,6 @@ def test_foods():
 
     res = _req()
     assert res.status_code == 200
-
-    res = _req()
-    assert res.status_code == 200
-
     foods = res.json()
     assert len(foods) == len(food_store) == 100
 

@@ -13,9 +13,10 @@ order:user                      {<orderid>: <userid>}
 
 order:<orderid>                 {<foodid>: <cnt> }
 
-food:id:stock                   ordered set: <updated-time> -> <foodcount>
-food:last_update_time           <last_update_time>
-timestamp                       current time
+//food:id:stock                   ordered set: <updated-time> -> <foodcount>
+//food:last_update_time           <last_update_time>
+//timestamp                       current time
+food:stock                      {<foodid>: <stock>}
 ```
 
 ## Sync with MySQL
