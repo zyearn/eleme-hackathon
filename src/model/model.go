@@ -75,12 +75,10 @@ var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
 var cache_cart_user = make(map[string]string)
-var cache_food_last_update_time int
 
 var mutex_cache_food_stock sync.Mutex
 var mutex_cache_token_user sync.Mutex
 var mutex_cache_cart_user sync.Mutex
-var mutex_cache_food_last_update_time sync.Mutex
 
 func atoi(str string) int {
 	res, err := strconv.Atoi(str)
@@ -230,46 +228,7 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 }
 
 func Get_foods() []map[string]interface{} {
-	mutex_cache_food_last_update_time.Lock()
-	_time := cache_food_last_update_time
-	mutex_cache_food_last_update_time.Unlock()
-
 	var ret []map[string]interface{}
-	ts := r.Get(constant.TIMESTAMP).Val()
-	if ts != "" {
-		time_latest, e := strconv.Atoi(ts)
-		if e != nil {
-			fmt.Println("err!strconv.Atoi(r.Get(constant.TIMESTAMP).Val, ", e)
-		} else {
-
-			if time_latest != _time && time_latest >= 99 {
-				mutex_cache_food_last_update_time.Lock()
-				cache_food_last_update_time = time_latest
-				mutex_cache_food_last_update_time.Unlock()
-
-				results := r.ZRangeByScore("food:id:stock", redis.ZRangeByScore{strconv.Itoa(_time), "+inf", 0, 0}).Val()
-
-				for i := 0; i < len(results); i += 1 {
-					if results[i] == "" {
-						continue
-					}
-					raw_number, err := strconv.ParseInt(results[i], 10, 64)
-					if err != nil {
-						L.Fatal("err strconv.ParseInt")
-						continue
-					}
-
-					id := int(raw_number / 10000 % 100000)
-					stock := int(raw_number % 10000)
-					food_id := strconv.Itoa(id)
-
-					mutex_cache_food_stock.Lock()
-					cache_food_stock[food_id] = stock
-					mutex_cache_food_stock.Unlock()
-				}
-			}
-		}
-	}
 
 	keys := []string{}
 	for k, _ := range cache_food_price {
@@ -392,7 +351,6 @@ func init_cache_and_redis(init_redis bool) {
 	L.Print("Actual init begins, init_redis=", init_redis)
 	placeOrder = Load_script_from_file("src/model/lua/place_order.lua")
 	adminQuery = Load_script_from_file("src/model/lua/admin_query.lua")
-	cache_food_last_update_time = 0
 	db, dberr := sql.Open("mysql",
 		os.Getenv("DB_USER")+
 			":"+
@@ -428,28 +386,19 @@ func init_cache_and_redis(init_redis bool) {
 		var id string
 		var stock, price int
 		rows.Scan(&id, &stock, &price)
-		idInt := atoi(id)
-		now += 1
 		cache_food_price[id] = price
 		cache_food_stock[id] = stock
 		//L.Print("adding food:", id)
 		if init_redis {
-			p.ZAdd(constant.FOOD_ID_STOCK,
-				redis.Z{
-					float64(now),
-					now*1000000000 + idInt*10000 + stock,
-				})
-			p.HSet(constant.FOOD_LAST_UPDATE_TIME, id, strconv.Itoa(now))
+			p.HSet("food:stock", id, strconv.Itoa(stock))
 		}
 	}
 
 	if init_redis {
-		p.Set(constant.TIMESTAMP, now, 0)
 		p.Set(constant.INIT_TIME, -10000, 0)
 		p.Exec()
 	}
 
-	cache_food_last_update_time = now
 }
 
 func Sync_redis_from_mysql() {
@@ -467,6 +416,7 @@ func Sync_redis_from_mysql() {
 			time.Sleep(200 * time.Millisecond)
 		}
 	}
+
 }
 
 /** init code **/
