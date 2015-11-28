@@ -7,12 +7,12 @@
 -- return -2: NOT_AUTHORIZED_TO_ACCESS_CART
 -- return -3: FOOD_OUT_OF_STOCK
 -- return -4: ORDER_OUT_OF_LIMIT
-local user_id = redis.call('get', 'token:'..KEYS[3]..':user')
 local belong_user = redis.call('get', 'cart:'..KEYS[1]..':user')
 if not belong_user then
     return -1
 end
 
+local user_id = redis.call('get', 'token:'..KEYS[3]..':user')
 if user_id ~= belong_user then
     return -2
 end

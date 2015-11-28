@@ -56,7 +56,7 @@ var r = redis.NewClient(&redis.Options{
 	Addr:         os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 	Password:     "",
 	DB:           0,
-	PoolSize:     350,
+	PoolSize:     1000,
 	MaxRetries:   3,
 	DialTimeout:  3 * time.Second,
 	ReadTimeout:  3 * time.Second,
@@ -90,7 +90,7 @@ func atoi(str string) int {
 	return res
 }
 
-var addFood, queryStock, placeOrder, adminQuery *redis.Script
+var placeOrder, adminQuery *redis.Script
 
 func Load_script_from_file(filename string) *redis.Script {
 	command_raw, err := ioutil.ReadFile(filename)
@@ -390,8 +390,6 @@ func AdminGetOrder(token string) string {
 
 func init_cache_and_redis(init_redis bool) {
 	L.Print("Actual init begins, init_redis=", init_redis)
-	addFood = Load_script_from_file("src/model/lua/add_food.lua")
-	queryStock = Load_script_from_file("src/model/lua/query_stock.lua")
 	placeOrder = Load_script_from_file("src/model/lua/place_order.lua")
 	adminQuery = Load_script_from_file("src/model/lua/admin_query.lua")
 	cache_food_last_update_time = 0
