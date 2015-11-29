@@ -240,6 +240,7 @@ func PostOrder(cart_id string, token string) (int, string) {
 	res, err := placeOrder.Run(r, []string{cart_id, order_id, token}, []string{}).Result()
 	if err != nil {
 		L.Fatal("Failed to post order, err:", err)
+		res = 0
 	}
 	rtn := int(res.(int64))
 	return rtn, order_id
