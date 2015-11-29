@@ -84,7 +84,8 @@ func Foods(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	res := model.Get_foods()
-	w.WriteJson(res)
+	w.(http.ResponseWriter).Write(res)
+
 }
 
 func Post_carts(w rest.ResponseWriter, r *rest.Request) {
