@@ -407,7 +407,7 @@ func init_cache_and_redis(init_redis bool) {
 			ret += `]`
 			//fmt.Println("ret=", ret)
 			ret_get_foods = []byte(ret)
-			time.Sleep(3 * time.Second)
+			time.Sleep(6 * time.Second)
 
 			food_stocks := r.HGetAll("food:stock").Val()
 			for i := 0; i < len(food_stocks); i += 2 {
