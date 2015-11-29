@@ -228,6 +228,7 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 
 func Get_foods() []byte {
 
+	// serve from cache, ensure Eventual Consistency
 	return ret_get_foods
 }
 

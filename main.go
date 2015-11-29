@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/bitly/go-simplejson"
 	"io"
 	"log"
 	"net/http"
@@ -42,15 +41,27 @@ func Index(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(map[string]string{"Body": "Hello World!"})
 }
 
+type loginMsg struct {
+	Username, Password string
+}
+
 func Login(w rest.ResponseWriter, r *rest.Request) {
 	//TokenChecker(r)
-	var data interface{}
-	rtn := parse_request_body(r, &data)
+
+	var data loginMsg
+	rtn := 0
+	err := json.NewDecoder(r.Body).Decode(&data)
+	switch {
+	case err == io.EOF:
+		rtn = -1
+	case err != nil:
+		rtn = -2
+	}
+
 	if rtn == 0 {
-		byte_json, _ := json.Marshal(data)
-		user_info, _ := simplejson.NewJson(byte_json)
-		username, _ := user_info.Get("username").String()
-		password, _ := user_info.Get("password").String()
+		username := data.Username
+		password := data.Password
+
 		rtn, user_id, token := model.PostLogin(username, password)
 
 		if rtn == 0 {
@@ -97,22 +108,37 @@ func Post_carts(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	cartid := model.Create_cart(token)
-	//w.WriteJson(map[string]string{"cart_id": cartid})
 	w.(http.ResponseWriter).Write([]byte(`{"cart_id":"` + cartid + `"}`))
+}
+
+type item struct {
+	Food_id, Count int
 }
 
 func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
+	if rtn < 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.(http.ResponseWriter).Write([]byte(`{"code": "INVALID_ACCESS_TOKEN", "message": "无效的令牌"}`))
+		return
+	}
+
 	cartid := r.PathParam("cartid")
 
 	//model.L.Print("cartid is ", cartid)
-	var data interface{}
-	rtn = parse_request_body(r, &data)
+	var data item
+	rtn = 0
+	err := json.NewDecoder(r.Body).Decode(&data)
+	switch {
+	case err == io.EOF:
+		rtn = -1
+	case err != nil:
+		rtn = -2
+	}
+
 	if rtn == 0 {
-		byte_json, _ := json.Marshal(data)
-		user_info, _ := simplejson.NewJson(byte_json)
-		foodid, _ := user_info.Get("food_id").Int()
-		count, _ := user_info.Get("count").Int()
+		foodid := data.Food_id
+		count := data.Count
 
 		rtn = model.Cart_add_food(token, cartid, foodid, count)
 		switch rtn {
@@ -141,6 +167,10 @@ func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
 	}
 }
 
+type cartId struct {
+	Cart_id string
+}
+
 func Post_orders(w rest.ResponseWriter, r *rest.Request) {
 	rtn, token := TokenChecker(r)
 	if rtn < 0 {
@@ -149,13 +179,18 @@ func Post_orders(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	var data interface{}
-	rtn = parse_request_body(r, &data)
+	var data cartId
+	rtn = 0
+	err := json.NewDecoder(r.Body).Decode(&data)
+	switch {
+	case err == io.EOF:
+		rtn = -1
+	case err != nil:
+		rtn = -2
+	}
+
 	if rtn == 0 {
-		byte_json, _ := json.Marshal(data)
-		user_info, _ := simplejson.NewJson(byte_json)
-		cart_id, _ := user_info.Get("cart_id").String()
-		rtn, order_id := model.PostOrder(cart_id, token)
+		rtn, order_id := model.PostOrder(data.Cart_id, token)
 
 		if rtn == 0 {
 			w.(http.ResponseWriter).Write([]byte(` {"id": ` +
