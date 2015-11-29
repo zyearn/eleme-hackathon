@@ -97,7 +97,8 @@ func Post_carts(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	cartid := model.Create_cart(token)
-	w.WriteJson(map[string]string{"cart_id": cartid})
+	//w.WriteJson(map[string]string{"cart_id": cartid})
+	w.(http.ResponseWriter).Write([]byte(`{"cart_id":"` + cartid + `"}`))
 }
 
 func Patch_carts(w rest.ResponseWriter, r *rest.Request) {
