@@ -5,18 +5,14 @@ package main
 import (
 	"./src/model"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
-	"runtime/pprof"
 	"strconv"
-	"syscall"
 )
 
 func TokenChecker(r *rest.Request) (int, string) {
@@ -266,28 +262,9 @@ func parse_request_body(r *rest.Request, data *interface{}) int {
 }
 
 /* Util function */
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	flag.Parse()
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-	}
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	signal.Notify(c, syscall.SIGTERM)
-	go func() {
-		<-c
-		pprof.StopCPUProfile()
-		os.Exit(0)
-	}()
 
 	model.Sync_redis_from_mysql()
 	fmt.Println("server started")
