@@ -5,17 +5,17 @@ package main
 import (
 	"./src/model"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"runtime"
-	"strconv"
-	"runtime/pprof"
-	"flag"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
+	"strconv"
 	"syscall"
 )
 
@@ -63,17 +63,14 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if rtn == 0 {
-		username := data.Username
-		password := data.Password
-
-		rtn, user_id, token := model.PostLogin(username, password)
+		rtn, user_id, token := model.PostLogin(data.Username, data.Password)
 
 		if rtn == 0 {
 			w.(http.ResponseWriter).Write([]byte(
 				` {"user_id": ` +
 					strconv.Itoa(user_id) +
 					`, "username": ` +
-					`"` + username + `"` +
+					`"` + data.Username + `"` +
 					`, "access_token": ` +
 					`"` + token + `"` +
 					`}`))

@@ -3,7 +3,6 @@ package model
 import (
 	"../constant"
 	"database/sql"
-	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/redis.v3"
 	"io/ioutil"
@@ -117,8 +116,7 @@ func PostLogin(username string, password string) (int, int, string) {
 	token := RandString(srcLogin, 8)
 	loginMutex.Unlock()
 
-	s := fmt.Sprintf("token:%s:user", token)
-	r.Set(s, user_id, 0)
+	r.Set("token:"+token+":user", user_id, 0)
 
 	mutex_cache_token_user.Lock()
 	cache_token_user[token] = user_id
@@ -139,8 +137,7 @@ func get_token_user(token string) string {
 	if ok {
 		return id
 	} else {
-		s := fmt.Sprintf("token:%s:user", token)
-		user_id := r.Get(s).Val()
+		user_id := r.Get("token:" + token + ":user").Val()
 		if user_id != "" {
 			mutex_cache_token_user.Lock()
 			cache_token_user[token] = user_id
@@ -165,7 +162,7 @@ func Create_cart(token string) string {
 	cartMutex.Unlock()
 
 	uid := get_token_user(token)
-	r.Set(fmt.Sprintf("cart:%s:user", cartid), uid, 0)
+	r.Set("cart:"+cartid+":user", uid, 0)
 	return cartid
 }
 
@@ -212,15 +209,13 @@ func PostOrder(cart_id string, token string) (int, string) {
 }
 
 func GetOrder(token string) (ret string, found bool) {
-	orderid := r.Get(fmt.Sprintf("user:%s:order", get_token_user(token))).Val()
+	orderid := r.Get("user:" + get_token_user(token) + ":order").Val()
 	if orderid == "" {
 		found = false
 		return
 	}
 	found = true
-	//cartid := r.HGet("order:cart", orderid).Val()
-	//items := r.HGetAll(fmt.Sprintf("cart:%s", cartid)).Val()
-	items := r.HGetAll(fmt.Sprintf("order:%s", orderid)).Val()
+	items := r.HGetAll("order:" + orderid).Val()
 
 	var item_str string
 	total := 0
