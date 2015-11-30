@@ -163,7 +163,7 @@ func Is_token_exist(token string) bool {
 
 func get_cart_user(cartid string) string {
 	mutex_cache_cart_user.Lock()
-	id, ok := cache_token_user[cartid]
+	id, ok := cache_cart_user[cartid]
 	mutex_cache_cart_user.Unlock()
 
 	if ok {
