@@ -35,9 +35,11 @@ var orderMutex sync.Mutex
 func RandString(src rand.Source, n int) string {
 	b := make([]byte, n)
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
-		}
+		/*
+			if remain == 0 {
+				cache, remain = src.Int63(), letterIdxMax
+			}
+		*/
 		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
 			b[i] = letterBytes[idx]
 			i--
@@ -181,7 +183,7 @@ func get_cart_user(cartid string) string {
 
 func Create_cart(token string) string {
 	cartMutex.Lock()
-	cartid := RandString(srcCart, 16)
+	cartid := RandString(srcCart, 8)
 	cartMutex.Unlock()
 
 	uid := get_token_user(token)
