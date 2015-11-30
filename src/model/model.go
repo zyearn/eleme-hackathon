@@ -76,11 +76,9 @@ var cache_userid = make(map[string]string) //name -> id
 var cache_food_price = make(map[string]int)
 var cache_food_stock = make(map[string]int)
 var cache_token_user = make(map[string]string)
-var cache_cart_user = make(map[string]string)
 
 var mutex_cache_food_stock sync.Mutex
 var mutex_cache_token_user sync.Mutex
-var mutex_cache_cart_user sync.Mutex
 
 var ret_get_foods []byte
 
@@ -92,7 +90,7 @@ func atoi(str string) int {
 	return res
 }
 
-var placeOrder, adminQuery *redis.Script
+var addFood, placeOrder, adminQuery *redis.Script
 
 func Load_script_from_file(filename string) *redis.Script {
 	command_raw, err := ioutil.ReadFile(filename)
@@ -161,26 +159,6 @@ func Is_token_exist(token string) bool {
 	}
 }
 
-func get_cart_user(cartid string) string {
-	mutex_cache_cart_user.Lock()
-	id, ok := cache_cart_user[cartid]
-	mutex_cache_cart_user.Unlock()
-
-	if ok {
-		return id
-	} else {
-		s := fmt.Sprintf("cart:%s:user", cartid)
-		user_id := r.Get(s).Val()
-		if cartid != "" {
-			mutex_cache_cart_user.Lock()
-			cache_cart_user[cartid] = user_id
-			mutex_cache_cart_user.Unlock()
-		}
-
-		return user_id
-	}
-}
-
 func Create_cart(token string) string {
 	cartMutex.Lock()
 	cartid := RandString(srcCart, 8)
@@ -188,10 +166,6 @@ func Create_cart(token string) string {
 
 	uid := get_token_user(token)
 	r.Set(fmt.Sprintf("cart:%s:user", cartid), uid, 0)
-	mutex_cache_cart_user.Lock()
-	cache_cart_user[cartid] = uid
-	mutex_cache_cart_user.Unlock()
-
 	return cartid
 }
 
@@ -203,29 +177,18 @@ func Cart_add_food(token, cartid string, foodid int, count int) int {
 		return -2
 	}
 
-	cart_user := get_cart_user(cartid)
-	if cart_user == "" {
-		return -1
+	count_s := strconv.Itoa(count)
+	res, err := addFood.Run(
+		r,
+		[]string{token, cartid, foodid_s, count_s},
+		[]string{}).Result()
+
+	if err != nil {
+		L.Fatal(err)
+		return 0
 	}
 
-	belong_user := get_token_user(token)
-	if belong_user != cart_user {
-		return -4
-	}
-
-	cart_items := r.HGetAll("cart:" + cartid).Val()
-	sum := 0
-	for i := 0; i < len(cart_items); i += 2 {
-		sum += atoi(cart_items[i+1])
-	}
-
-	if sum+count > 3 {
-		return -3
-	}
-
-	r.HIncrBy("cart:"+cartid, foodid_s, int64(count))
-
-	return 0
+	return int(res.(int64))
 }
 
 func Get_foods() []byte {
@@ -334,6 +297,7 @@ func init_cache_and_redis(init_redis bool) {
 	L.Print("Actual init begins, init_redis=", init_redis)
 	placeOrder = Load_script_from_file("src/model/lua/place_order.lua")
 	adminQuery = Load_script_from_file("src/model/lua/admin_query.lua")
+	addFood = Load_script_from_file("src/model/lua/add_food.lua")
 	db, dberr := sql.Open("mysql",
 		os.Getenv("DB_USER")+
 			":"+
