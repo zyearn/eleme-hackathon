@@ -5,19 +5,23 @@ package main
 import (
 	"./src/model"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
+	"syscall"
 )
 
 func TokenChecker(r *rest.Request) (int, string) {
-	t1 := r.Header.Get("Access-Token")
-	t2 := r.URL.Query().Get("access_token")
+	t1 := r.URL.Query().Get("access_token")
+	t2 := r.Header.Get("Access-Token")
 
 	var token string
 	if t1 != "" {
@@ -59,17 +63,14 @@ func Login(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if rtn == 0 {
-		username := data.Username
-		password := data.Password
-
-		rtn, user_id, token := model.PostLogin(username, password)
+		rtn, user_id, token := model.PostLogin(data.Username, data.Password)
 
 		if rtn == 0 {
 			w.(http.ResponseWriter).Write([]byte(
 				` {"user_id": ` +
 					strconv.Itoa(user_id) +
 					`, "username": ` +
-					`"` + username + `"` +
+					`"` + data.Username + `"` +
 					`, "access_token": ` +
 					`"` + token + `"` +
 					`}`))
@@ -265,8 +266,29 @@ func parse_request_body(r *rest.Request, data *interface{}) int {
 }
 
 /* Util function */
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+	go func() {
+		<-c
+		pprof.StopCPUProfile()
+		os.Exit(0)
+	}()
+
 	model.Sync_redis_from_mysql()
 	fmt.Println("server started")
 
