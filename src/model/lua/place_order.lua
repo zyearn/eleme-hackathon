@@ -22,7 +22,7 @@ if order_exist then
     return -4
 end
 
-local tb = {}
+local tb = {n=9}
 local n = 1
 local cart_items = redis.call('hgetall', 'cart:'..KEYS[1])
 for i = 1, #cart_items, 2 do

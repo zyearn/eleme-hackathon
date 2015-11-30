@@ -20,8 +20,8 @@ import (
 )
 
 func TokenChecker(r *rest.Request) (int, string) {
-	t1 := r.Header.Get("Access-Token")
-	t2 := r.URL.Query().Get("access_token")
+	t1 := r.URL.Query().Get("access_token")
+	t2 := r.Header.Get("Access-Token")
 
 	var token string
 	if t1 != "" {
