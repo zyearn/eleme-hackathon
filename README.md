@@ -1,3 +1,5 @@
+more detail please visit: http://lifeofzjs.com/blog/2015/12/02/eleme-hackathon/
+
 # Eleme Hackathon Intro
 
 饿了么 Hackathon 2015 初赛信息介绍。
